@@ -753,6 +753,7 @@ canvas#trendCanvas {
 
 .vitals-panel-row .big-vital {
   flex: 1;
+  display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
@@ -899,28 +900,27 @@ canvas#trendCanvas {
   <div class="detail-layout">
     <!-- 横排生命体征参数 -->
     <div class="vitals-panel vitals-panel-row">
-      <div class="panel-title" style="display:none">📊 实时生命体征</div>
-      <div class="big-vital" style="display:flex">
+      <div class="big-vital">
         <span class="bv-label">心率 HR</span>
         <span class="bv-value" id="bv-hr">--</span>
         <span class="bv-unit">bpm</span>
       </div>
-      <div class="big-vital" style="display:flex">
+      <div class="big-vital">
         <span class="bv-label">血氧 SpO₂</span>
         <span class="bv-value" id="bv-spo2">--</span>
         <span class="bv-unit">%</span>
       </div>
-      <div class="big-vital" style="display:flex">
+      <div class="big-vital">
         <span class="bv-label">血压 NIBP</span>
         <span class="bv-value" id="bv-nibp" style="font-size:22px">--/--</span>
         <span class="bv-unit">mmHg</span>
       </div>
-      <div class="big-vital" style="display:flex">
+      <div class="big-vital">
         <span class="bv-label">呼吸 RR</span>
         <span class="bv-value" id="bv-rr">--</span>
         <span class="bv-unit">次/分</span>
       </div>
-      <div class="big-vital" style="display:flex">
+      <div class="big-vital">
         <span class="bv-label">体温 Temp</span>
         <span class="bv-value" id="bv-temp">--</span>
         <span class="bv-unit">°C</span>
@@ -1451,6 +1451,7 @@ function generateBeatSegment(params, totalSamples) {
 const ecg12State = {};
 let ecg12AnimId = null;
 let ecg12Tick = 0;
+const ECG12_FRAME_SKIP = 2; // 每N帧推进一格，控制滚动速度
 
 function initEcg12() {
   const canvases = document.querySelectorAll('.ecg12-canvas');
@@ -1464,7 +1465,7 @@ function initEcg12() {
     ecg12State[lead] = {
       canvas,
       ctx: canvas.getContext('2d'),
-      offset: Math.floor(Math.random() * beatSamples),
+      offset: 0,
       params,
       beatSamples,
       beatData,
@@ -1506,7 +1507,7 @@ function drawEcg12Lead(state) {
 
 function tickEcg12() {
   ecg12Tick++;
-  if (ecg12Tick % 2 === 0) {
+  if (ecg12Tick % ECG12_FRAME_SKIP === 0) {
     Object.values(ecg12State).forEach(state => {
       state.offset = (state.offset + 1) % state.beatSamples;
       drawEcg12Lead(state);
