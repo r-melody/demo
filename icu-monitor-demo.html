@@ -307,9 +307,7 @@ body {
 .back-btn:hover { background: var(--primary); color: var(--bg); }
 
 .detail-layout {
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 16px;
+  display: block;
   margin-bottom: 16px;
 }
 
@@ -740,6 +738,93 @@ canvas#trendCanvas {
 
 /* ===== 网格布局辅助 ===== */
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* ===== vitals-panel 横向排列 ===== */
+.vitals-panel-row {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 20px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.vitals-panel-row .big-vital {
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  border-bottom: none;
+  border-right: 1px solid var(--border);
+  padding: 8px 16px;
+}
+
+.vitals-panel-row .big-vital:last-child {
+  border-right: none;
+}
+
+.vitals-panel-row .bv-label {
+  width: auto;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  display: block;
+}
+
+.vitals-panel-row .bv-value {
+  font-size: 28px;
+}
+
+.vitals-panel-row .bv-unit {
+  width: auto;
+  display: block;
+  text-align: center;
+  margin-top: 2px;
+}
+
+/* ===== 12导联ECG面板 ===== */
+.ecg12-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.ecg12-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ecg12-cell {
+  background: #050a14;
+  border-radius: 6px;
+  padding: 4px 6px;
+  position: relative;
+  border: 1px solid rgba(30,45,74,0.6);
+}
+
+.ecg12-lead-label {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 0.5px;
+  z-index: 2;
+}
+
+.ecg12-canvas {
+  width: 100%;
+  height: 80px;
+  display: block;
+}
 </style>
 </head>
 <body>
@@ -810,47 +895,66 @@ canvas#trendCanvas {
     <button class="back-btn" onclick="switchTab('dept')">← 返回大屏</button>
   </div>
 
-  <!-- 主体：左侧参数 + 右侧ECG -->
+  <!-- 主体：生命体征横排 -->
   <div class="detail-layout">
-    <!-- 左侧参数面板 -->
-    <div class="vitals-panel">
-      <div class="panel-title">📊 实时生命体征</div>
-      <div class="big-vital">
+    <!-- 横排生命体征参数 -->
+    <div class="vitals-panel vitals-panel-row">
+      <div class="panel-title" style="display:none">📊 实时生命体征</div>
+      <div class="big-vital" style="display:flex">
         <span class="bv-label">心率 HR</span>
         <span class="bv-value" id="bv-hr">--</span>
         <span class="bv-unit">bpm</span>
       </div>
-      <div class="big-vital">
+      <div class="big-vital" style="display:flex">
         <span class="bv-label">血氧 SpO₂</span>
         <span class="bv-value" id="bv-spo2">--</span>
         <span class="bv-unit">%</span>
       </div>
-      <div class="big-vital">
+      <div class="big-vital" style="display:flex">
         <span class="bv-label">血压 NIBP</span>
         <span class="bv-value" id="bv-nibp" style="font-size:22px">--/--</span>
         <span class="bv-unit">mmHg</span>
       </div>
-      <div class="big-vital">
+      <div class="big-vital" style="display:flex">
         <span class="bv-label">呼吸 RR</span>
         <span class="bv-value" id="bv-rr">--</span>
         <span class="bv-unit">次/分</span>
       </div>
-      <div class="big-vital">
+      <div class="big-vital" style="display:flex">
         <span class="bv-label">体温 Temp</span>
         <span class="bv-value" id="bv-temp">--</span>
         <span class="bv-unit">°C</span>
       </div>
     </div>
+  </div>
 
-    <!-- 右侧ECG波形 -->
-    <div class="ecg-panel">
-      <div class="panel-title">💓 心电图 ECG（实时）</div>
-      <canvas id="ecgCanvas"></canvas>
-      <div style="margin-top:10px; display:flex; gap:20px; font-size:12px; color:var(--text-dim);">
-        <span>心率: <span id="ecg-hr-label" style="color:var(--ok)">--</span> bpm</span>
+  <!-- 12导联ECG面板 -->
+  <div class="ecg12-panel">
+    <div class="panel-title" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>💓 12导联心电图 ECG（实时模拟）</span>
+      <div style="display:flex; gap:20px; font-size:12px; color:var(--text-dim);">
+        <span>心率: <span id="ecg-hr-label" style="color:var(--ok)">75</span> bpm</span>
         <span>增益: 10 mm/mV</span>
         <span>纸速: 25 mm/s</span>
       </div>
+    </div>
+    <!-- 3×4 导联网格 -->
+    <div class="ecg12-grid">
+      <!-- 第1行：I, II, III, aVR -->
+      <div class="ecg12-cell"><div class="ecg12-lead-label">I</div><canvas class="ecg12-canvas" data-lead="I"></canvas></div>
+      <div class="ecg12-cell"><div class="ecg12-lead-label">II</div><canvas class="ecg12-canvas" data-lead="II"></canvas></div>
+      <div class="ecg12-cell"><div class="ecg12-lead-label">III</div><canvas class="ecg12-canvas" data-lead="III"></canvas></div>
+      <div class="ecg12-cell"><div class="ecg12-lead-label">aVR</div><canvas class="ecg12-canvas" data-lead="aVR"></canvas></div>
+      <!-- 第2行：aVL, aVF, V1, V2 -->
+      <div class="ecg12-cell"><div class="ecg12-lead-label">aVL</div><canvas class="ecg12-canvas" data-lead="aVL"></canvas></div>
+      <div class="ecg12-cell"><div class="ecg12-lead-label">aVF</div><canvas class="ecg12-canvas" data-lead="aVF"></canvas></div>
+      <div class="ecg12-cell"><div class="ecg12-lead-label">V1</div><canvas class="ecg12-canvas" data-lead="V1"></canvas></div>
+      <div class="ecg12-cell"><div class="ecg12-lead-label">V2</div><canvas class="ecg12-canvas" data-lead="V2"></canvas></div>
+      <!-- 第3行：V3, V4, V5, V6 -->
+      <div class="ecg12-cell"><div class="ecg12-lead-label">V3</div><canvas class="ecg12-canvas" data-lead="V3"></canvas></div>
+      <div class="ecg12-cell"><div class="ecg12-lead-label">V4</div><canvas class="ecg12-canvas" data-lead="V4"></canvas></div>
+      <div class="ecg12-cell"><div class="ecg12-lead-label">V5</div><canvas class="ecg12-canvas" data-lead="V5"></canvas></div>
+      <div class="ecg12-cell"><div class="ecg12-lead-label">V6</div><canvas class="ecg12-canvas" data-lead="V6"></canvas></div>
     </div>
   </div>
 
@@ -1045,7 +1149,9 @@ function switchTab(name) {
     }, 100);
   }
   if (name === 'patient') {
-    setTimeout(() => { startEcg(); updateDetailPanel(); }, 100);
+    setTimeout(() => { startEcg12(); updateDetailPanel(); }, 100);
+  } else {
+    stopEcg12();
   }
 }
 
@@ -1296,6 +1402,131 @@ function startEcg() {
   }
 
   draw();
+}
+
+// ===== 12导联ECG模拟 =====
+
+const LEAD_PARAMS = {
+  'I':   { p:0.6,  q:-0.1,  r:1.0,  s:-0.15, t:0.5,  baseline:0 },
+  'II':  { p:0.8,  q:-0.15, r:1.2,  s:-0.2,  t:0.6,  baseline:0 },
+  'III': { p:0.3,  q:-0.05, r:0.5,  s:-0.3,  t:0.25, baseline:0 },
+  'aVR': { p:-0.5, q:0.1,   r:-0.8, s:0.1,   t:-0.4, baseline:0 },
+  'aVL': { p:0.4,  q:-0.1,  r:0.6,  s:-0.1,  t:0.3,  baseline:0 },
+  'aVF': { p:0.6,  q:-0.1,  r:0.9,  s:-0.25, t:0.45, baseline:0 },
+  'V1':  { p:0.2,  q:-0.1,  r:0.3,  s:-0.8,  t:-0.2, baseline:0 },
+  'V2':  { p:0.25, q:-0.15, r:0.6,  s:-0.9,  t:0.1,  baseline:0 },
+  'V3':  { p:0.4,  q:-0.15, r:0.9,  s:-0.5,  t:0.3,  baseline:0 },
+  'V4':  { p:0.6,  q:-0.15, r:1.3,  s:-0.3,  t:0.5,  baseline:0 },
+  'V5':  { p:0.7,  q:-0.1,  r:1.4,  s:-0.2,  t:0.55, baseline:0 },
+  'V6':  { p:0.65, q:-0.1,  r:1.1,  s:-0.15, t:0.5,  baseline:0 },
+};
+
+function generateBeatSegment(params, totalSamples) {
+  const pts = new Float32Array(totalSamples);
+  const pStart  = 0,      pEnd  = 0.10;
+  const qStart  = 0.16,   qEnd  = 0.18;
+  const rStart  = 0.18,   rEnd  = 0.22;
+  const sStart  = 0.22,   sEnd  = 0.24;
+  const stEnd   = 0.38;
+  const tStart  = 0.38,   tEnd  = 0.56;
+  const n = totalSamples;
+  for (let i = 0; i < n; i++) {
+    const x = i / n;
+    let v = 0;
+    const pMid = (pStart + pEnd) / 2, pSig = (pEnd - pStart) / 3;
+    v += params.p * Math.exp(-0.5 * Math.pow((x - pMid) / pSig, 2));
+    const qMid = (qStart + qEnd) / 2, qSig = (qEnd - qStart) / 2.5;
+    v += params.q * Math.exp(-0.5 * Math.pow((x - qMid) / qSig, 2));
+    const rMid = (rStart + rEnd) / 2, rSig = (rEnd - rStart) / 3;
+    v += params.r * Math.exp(-0.5 * Math.pow((x - rMid) / rSig, 2));
+    const sMid = (sStart + sEnd) / 2, sSig = (sEnd - sStart) / 2.5;
+    v += params.s * Math.exp(-0.5 * Math.pow((x - sMid) / sSig, 2));
+    const tMid = (tStart + tEnd) / 2, tSig = (tEnd - tStart) / 3;
+    v += params.t * Math.exp(-0.5 * Math.pow((x - tMid) / tSig, 2));
+    pts[i] = v;
+  }
+  return pts;
+}
+
+const ecg12State = {};
+let ecg12AnimId = null;
+let ecg12Tick = 0;
+
+function initEcg12() {
+  const canvases = document.querySelectorAll('.ecg12-canvas');
+  canvases.forEach(canvas => {
+    const lead = canvas.dataset.lead;
+    canvas.width  = canvas.offsetWidth  || 300;
+    canvas.height = canvas.offsetHeight || 80;
+    const params = LEAD_PARAMS[lead];
+    const beatSamples = 200;
+    const beatData = generateBeatSegment(params, beatSamples);
+    ecg12State[lead] = {
+      canvas,
+      ctx: canvas.getContext('2d'),
+      offset: Math.floor(Math.random() * beatSamples),
+      params,
+      beatSamples,
+      beatData,
+    };
+  });
+}
+
+function drawEcg12Lead(state) {
+  const { canvas, ctx, offset, beatData, beatSamples } = state;
+  const W = canvas.width, H = canvas.height;
+  ctx.fillStyle = '#050a14';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(0,212,255,0.06)';
+  ctx.lineWidth = 0.5;
+  const gridSize = 10;
+  for (let x = 0; x <= W; x += gridSize) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y <= H; y += gridSize) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  const mid = H / 2, amp = H * 0.35;
+  ctx.beginPath();
+  ctx.strokeStyle = '#00ff88';
+  ctx.lineWidth = 1.2;
+  ctx.lineJoin = 'round';
+  for (let px = 0; px < W; px++) {
+    const val = beatData[(px + offset) % beatSamples];
+    const y = mid - val * amp;
+    if (px === 0) ctx.moveTo(px, y); else ctx.lineTo(px, y);
+  }
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(0,255,136,0.9)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(W - 1, 0); ctx.lineTo(W - 1, H);
+  ctx.stroke();
+}
+
+function tickEcg12() {
+  ecg12Tick++;
+  if (ecg12Tick % 2 === 0) {
+    Object.values(ecg12State).forEach(state => {
+      state.offset = (state.offset + 1) % state.beatSamples;
+      drawEcg12Lead(state);
+    });
+  }
+  ecg12AnimId = requestAnimationFrame(tickEcg12);
+}
+
+function startEcg12() {
+  if (ecg12AnimId) cancelAnimationFrame(ecg12AnimId);
+  ecg12Tick = 0;
+  initEcg12();
+  tickEcg12();
+}
+
+function stopEcg12() {
+  if (ecg12AnimId) {
+    cancelAnimationFrame(ecg12AnimId);
+    ecg12AnimId = null;
+  }
 }
 
 /* --- 报警历史 --- */
@@ -1739,11 +1970,8 @@ window.addEventListener('resize', () => {
   }
   const ecgModule = document.getElementById('module-patient');
   if (ecgModule && ecgModule.classList.contains('active')) {
-    const canvas = document.getElementById('ecgCanvas');
-    if (canvas) {
-      // ECG canvas 同样减去面板内边距（左右各16px = 32px）
-      canvas.width = canvas.parentElement.clientWidth - 32;
-    }
+    // 重新初始化12导联ECG以适应新尺寸
+    startEcg12();
   }
 });
 </script>
