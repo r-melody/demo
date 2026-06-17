@@ -1229,9 +1229,11 @@ function startEcg() {
 
   function draw() {
     const p = selectedPatient !== null ? PATIENTS[selectedPatient] : PATIENTS[0];
-    // 心率影响周期
+    // 心率影响周期：cycleLen = 数据点数/心跳
+    // bps = 心跳/秒，60/bps = 秒/心跳，乘以帧率基准(60)换算为数据点数
+    // 例：75 bpm → bps=1.25 → cycleLen≈48点/心跳（500点画面约显示10个心跳）
     const bps = (p ? p.hr : 75) / 60;
-    const cycleLen = Math.round(60 / bps); // 像素数/心跳
+    const cycleLen = Math.round(60 / bps); // 约40~80，合理范围
 
     // 滚动：移除最旧数据，添加新数据
     for (let s = 0; s < speed; s++) {
@@ -1338,7 +1340,9 @@ const ALARM_EVENTS_HOURS = [3, 4, 11, 17];
 function drawTrendChart() {
   const canvas = document.getElementById('trendCanvas');
   const container = canvas.parentElement;
-  canvas.width = container.clientWidth - 32;
+  // 减去面板内边距（左右各16px = 32px），确保 canvas 不超出容器宽度
+  const CHART_PADDING = 32;
+  canvas.width = container.clientWidth - CHART_PADDING;
   canvas.height = 260;
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
@@ -1585,7 +1589,8 @@ window.addEventListener('resize', () => {
   if (ecgModule && ecgModule.classList.contains('active')) {
     const canvas = document.getElementById('ecgCanvas');
     if (canvas) {
-      canvas.width = canvas.parentElement.clientWidth;
+      // ECG canvas 同样减去面板内边距（左右各16px = 32px）
+      canvas.width = canvas.parentElement.clientWidth - 32;
     }
   }
 });
