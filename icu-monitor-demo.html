@@ -1,0 +1,1594 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>重症监护大屏 Demo</title>
+<style>
+/* ===== 全局样式 ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0e1a;
+  --card: #0d1321;
+  --card2: #111827;
+  --border: #1e2d4a;
+  --primary: #00d4ff;
+  --primary-dim: rgba(0,212,255,0.15);
+  --danger: #ff3b3b;
+  --danger-dim: rgba(255,59,59,0.18);
+  --warn: #ffaa00;
+  --warn-dim: rgba(255,170,0,0.15);
+  --ok: #00ff88;
+  --ok-dim: rgba(0,255,136,0.12);
+  --text: #c8d8e8;
+  --text-dim: #5a7a9a;
+  --font: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  min-width: 1280px;
+  overflow-x: hidden;
+}
+
+/* ===== 顶部导航 Tab ===== */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 52px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.nav-logo {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 1px;
+  margin-right: 40px;
+  white-space: nowrap;
+}
+
+.nav-tabs {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.nav-tab {
+  padding: 8px 22px;
+  border-radius: 6px 6px 0 0;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+  font-family: var(--font);
+}
+
+.nav-tab:hover { color: var(--text); background: var(--primary-dim); }
+.nav-tab.active {
+  color: var(--primary);
+  border-bottom: 2px solid var(--primary);
+  background: var(--primary-dim);
+}
+
+/* ===== 模块容器 ===== */
+.module { display: none; padding: 20px 24px; min-height: calc(100vh - 52px); }
+.module.active { display: block; }
+
+/* ===== 通用卡片 ===== */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+/* ===== 科室大屏顶部信息栏 ===== */
+.dept-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 24px;
+  margin-bottom: 20px;
+}
+
+.dept-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 2px;
+}
+
+.dept-stats {
+  display: flex;
+  gap: 40px;
+}
+
+.dept-stat {
+  text-align: center;
+}
+
+.dept-stat-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.dept-stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.dept-stat-value.alarm { color: var(--danger); }
+.dept-stat-value.warn { color: var(--warn); }
+
+.dept-time {
+  font-size: 22px;
+  color: var(--primary);
+  font-weight: 600;
+  letter-spacing: 2px;
+  font-family: monospace;
+}
+
+/* ===== 床位卡片网格 ===== */
+.bed-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.bed-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.bed-card:hover { border-color: var(--primary); transform: translateY(-2px); }
+
+.bed-card.status-ok { border-left: 3px solid var(--ok); }
+.bed-card.status-warn { border-left: 3px solid var(--warn); }
+.bed-card.status-danger {
+  border: 1px solid var(--danger);
+  border-left: 3px solid var(--danger);
+  animation: card-blink 1.2s ease-in-out infinite;
+}
+
+@keyframes card-blink {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 12px 2px rgba(255,59,59,0.5); }
+}
+
+.bed-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.bed-no {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.bed-patient {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.bed-patient-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.status-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+
+.status-badge.ok { background: var(--ok-dim); color: var(--ok); }
+.status-badge.warn { background: var(--warn-dim); color: var(--warn); }
+.status-badge.danger {
+  background: var(--danger-dim);
+  color: var(--danger);
+  animation: text-blink 1s ease-in-out infinite;
+}
+
+@keyframes text-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* 生命体征参数列表 */
+.vitals-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.vital-item {
+  display: flex;
+  flex-direction: column;
+  background: var(--card2);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.vital-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+
+.vital-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary);
+  font-family: monospace;
+}
+
+.vital-unit {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.vital-value.danger { color: var(--danger); }
+.vital-value.warn { color: var(--warn); }
+
+/* ===== 患者详情模块 ===== */
+.patient-header {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 24px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.patient-name-block .name {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.patient-name-block .sub {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.patient-meta {
+  display: flex;
+  gap: 30px;
+}
+
+.meta-item { text-align: center; }
+.meta-label { font-size: 11px; color: var(--text-dim); }
+.meta-value { font-size: 14px; color: var(--text); font-weight: 600; margin-top: 2px; }
+
+.back-btn {
+  background: var(--primary-dim);
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  padding: 7px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--font);
+  transition: all 0.2s;
+}
+
+.back-btn:hover { background: var(--primary); color: var(--bg); }
+
+.detail-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+/* 左侧大参数面板 */
+.vitals-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.panel-title {
+  font-size: 13px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  letter-spacing: 1px;
+}
+
+.big-vital {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(30,45,74,0.5);
+}
+
+.big-vital:last-child { border-bottom: none; }
+
+.bv-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  width: 80px;
+}
+
+.bv-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--primary);
+  font-family: monospace;
+  letter-spacing: 1px;
+}
+
+.bv-value.danger { color: var(--danger); }
+.bv-value.warn { color: var(--warn); }
+
+.bv-unit {
+  font-size: 12px;
+  color: var(--text-dim);
+  width: 60px;
+  text-align: right;
+}
+
+/* ECG Canvas 区域 */
+.ecg-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.ecg-canvas-wrap {
+  flex: 1;
+  position: relative;
+}
+
+canvas#ecgCanvas {
+  width: 100%;
+  height: 200px;
+  display: block;
+  background: #050a14;
+  border-radius: 6px;
+}
+
+/* 呼吸机参数面板 */
+.vent-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.vent-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.vent-item {
+  background: var(--card2);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+
+.vent-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.vent-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: #00d4ff;
+  font-family: monospace;
+}
+
+.vent-unit {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* 报警历史 */
+.alarm-history {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.alarm-history-list { margin-top: 10px; }
+
+.alarm-history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(30,45,74,0.5);
+  font-size: 13px;
+}
+
+.alarm-history-item:last-child { border-bottom: none; }
+
+.ah-time { color: var(--text-dim); width: 80px; font-family: monospace; }
+.ah-level { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; width: 50px; text-align: center; }
+.ah-level.danger { background: var(--danger-dim); color: var(--danger); }
+.ah-level.warn { background: var(--warn-dim); color: var(--warn); }
+.ah-level.info { background: var(--primary-dim); color: var(--primary); }
+.ah-desc { flex: 1; color: var(--text); }
+
+/* ===== 数据回顾模块 ===== */
+.review-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 20px;
+}
+
+.review-toolbar label { font-size: 13px; color: var(--text-dim); }
+
+.review-toolbar input[type=datetime-local] {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: var(--font);
+  cursor: pointer;
+}
+
+.review-toolbar input[type=datetime-local]:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+/* 趋势图 */
+.trend-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.trend-legend {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 10px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+canvas#trendCanvas {
+  width: 100%;
+  height: 260px;
+  display: block;
+  background: #050a14;
+  border-radius: 6px;
+}
+
+/* 趋势数据表格 */
+.review-table-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-top: 10px;
+}
+
+.data-table th {
+  background: var(--card2);
+  color: var(--text-dim);
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.data-table td {
+  padding: 7px 12px;
+  border-bottom: 1px solid rgba(30,45,74,0.4);
+  color: var(--text);
+}
+
+.data-table tr:hover td { background: rgba(0,212,255,0.04); }
+.data-table tr.abnormal td { background: rgba(255,59,59,0.07); color: var(--danger); }
+.data-table tr.abnormal td:first-child { color: var(--danger); }
+
+/* 事件列表 */
+.event-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.event-filter {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.filter-btn {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 5px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--font);
+  transition: all 0.2s;
+}
+
+.filter-btn.active, .filter-btn:hover {
+  background: var(--primary-dim);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.event-list { max-height: 280px; overflow-y: auto; }
+
+.event-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(30,45,74,0.4);
+  font-size: 13px;
+}
+
+.event-item:last-child { border-bottom: none; }
+
+.ev-time { color: var(--text-dim); width: 75px; font-family: monospace; }
+.ev-type { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; width: 44px; text-align: center; }
+.ev-type.alarm-type { background: var(--danger-dim); color: var(--danger); }
+.ev-type.op-type { background: var(--primary-dim); color: var(--primary); }
+.ev-type.order-type { background: var(--ok-dim); color: var(--ok); }
+.ev-desc { flex: 1; color: var(--text); }
+
+/* ===== 报警事件模块 ===== */
+.alarm-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.alarm-stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  text-align: center;
+}
+
+.asc-label {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.asc-value {
+  font-size: 38px;
+  font-weight: 700;
+  font-family: monospace;
+}
+
+.asc-value.total { color: var(--primary); }
+.asc-value.handled { color: var(--ok); }
+.asc-value.unhandled { color: var(--danger); }
+.asc-value.resp { color: var(--warn); }
+
+.asc-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+/* 报警列表 */
+.alarm-list-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.alarm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-top: 10px;
+}
+
+.alarm-table th {
+  background: var(--card2);
+  color: var(--text-dim);
+  padding: 9px 12px;
+  text-align: left;
+  font-weight: 600;
+}
+
+.alarm-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(30,45,74,0.4);
+  color: var(--text);
+}
+
+.alarm-table tr.unhandled td { background: rgba(255,59,59,0.06); }
+.alarm-table tr:hover td { background: rgba(0,212,255,0.04); }
+
+.level-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.level-badge.critical { background: var(--danger-dim); color: var(--danger); }
+.level-badge.warning { background: var(--warn-dim); color: var(--warn); }
+.level-badge.info { background: var(--primary-dim); color: var(--primary); }
+
+.handle-btn {
+  background: var(--primary-dim);
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  border-radius: 5px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--font);
+  transition: all 0.2s;
+}
+
+.handle-btn:hover { background: var(--primary); color: var(--bg); }
+.handle-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: transparent;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+
+.status-dot.unhandled {
+  background: var(--danger);
+  box-shadow: 0 0 6px var(--danger);
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+.status-dot.handled { background: var(--ok); }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* 滚动条美化 */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--card); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
+/* ===== 网格布局辅助 ===== */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+</style>
+</head>
+<body>
+
+<!-- ===== 顶部导航 ===== -->
+<div class="nav-bar">
+  <div class="nav-logo">⚕ ICU Monitor</div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchTab('dept')">科室监护大屏</button>
+    <button class="nav-tab" onclick="switchTab('patient')">单患者详情</button>
+    <button class="nav-tab" onclick="switchTab('review')">数据回顾</button>
+    <button class="nav-tab" onclick="switchTab('alarm')">报警事件</button>
+  </div>
+</div>
+
+<!-- ===== 模块1：科室监护大屏 ===== -->
+<div id="module-dept" class="module active">
+  <!-- 顶部信息栏 -->
+  <div class="dept-header">
+    <div class="dept-title">🏥 重症监护病房 (ICU)</div>
+    <div class="dept-stats">
+      <div class="dept-stat">
+        <div class="dept-stat-label">在监患者</div>
+        <div class="dept-stat-value" id="stat-patient">8</div>
+      </div>
+      <div class="dept-stat">
+        <div class="dept-stat-label">危急报警</div>
+        <div class="dept-stat-value alarm" id="stat-danger">2</div>
+      </div>
+      <div class="dept-stat">
+        <div class="dept-stat-label">警告数</div>
+        <div class="dept-stat-value warn" id="stat-warn">1</div>
+      </div>
+    </div>
+    <div class="dept-time" id="dept-clock">--:--:--</div>
+  </div>
+
+  <!-- 床位卡片 4×2 -->
+  <div class="bed-grid" id="bed-grid"></div>
+</div>
+
+<!-- ===== 模块2：单患者详情 ===== -->
+<div id="module-patient" class="module">
+  <!-- 患者信息头部 -->
+  <div class="patient-header">
+    <div class="patient-name-block">
+      <div class="name" id="detail-name">-- --</div>
+      <div class="sub" id="detail-diag">诊断：--</div>
+    </div>
+    <div class="patient-meta">
+      <div class="meta-item">
+        <div class="meta-label">床号</div>
+        <div class="meta-value" id="detail-bed">--</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">年龄/性别</div>
+        <div class="meta-value" id="detail-age">--</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">入院时间</div>
+        <div class="meta-value" id="detail-admit">--</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">状态</div>
+        <div class="meta-value" id="detail-status">--</div>
+      </div>
+    </div>
+    <button class="back-btn" onclick="switchTab('dept')">← 返回大屏</button>
+  </div>
+
+  <!-- 主体：左侧参数 + 右侧ECG -->
+  <div class="detail-layout">
+    <!-- 左侧参数面板 -->
+    <div class="vitals-panel">
+      <div class="panel-title">📊 实时生命体征</div>
+      <div class="big-vital">
+        <span class="bv-label">心率 HR</span>
+        <span class="bv-value" id="bv-hr">--</span>
+        <span class="bv-unit">bpm</span>
+      </div>
+      <div class="big-vital">
+        <span class="bv-label">血氧 SpO₂</span>
+        <span class="bv-value" id="bv-spo2">--</span>
+        <span class="bv-unit">%</span>
+      </div>
+      <div class="big-vital">
+        <span class="bv-label">血压 NIBP</span>
+        <span class="bv-value" id="bv-nibp" style="font-size:22px">--/--</span>
+        <span class="bv-unit">mmHg</span>
+      </div>
+      <div class="big-vital">
+        <span class="bv-label">呼吸 RR</span>
+        <span class="bv-value" id="bv-rr">--</span>
+        <span class="bv-unit">次/分</span>
+      </div>
+      <div class="big-vital">
+        <span class="bv-label">体温 Temp</span>
+        <span class="bv-value" id="bv-temp">--</span>
+        <span class="bv-unit">°C</span>
+      </div>
+    </div>
+
+    <!-- 右侧ECG波形 -->
+    <div class="ecg-panel">
+      <div class="panel-title">💓 心电图 ECG（实时）</div>
+      <canvas id="ecgCanvas"></canvas>
+      <div style="margin-top:10px; display:flex; gap:20px; font-size:12px; color:var(--text-dim);">
+        <span>心率: <span id="ecg-hr-label" style="color:var(--ok)">--</span> bpm</span>
+        <span>增益: 10 mm/mV</span>
+        <span>纸速: 25 mm/s</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 呼吸机参数 -->
+  <div class="vent-panel">
+    <div class="panel-title">🫁 呼吸机参数</div>
+    <div class="vent-grid">
+      <div class="vent-item">
+        <div class="vent-label">潮气量 VT</div>
+        <div class="vent-value" id="vent-vt">450</div>
+        <div class="vent-unit">mL</div>
+      </div>
+      <div class="vent-item">
+        <div class="vent-label">PEEP</div>
+        <div class="vent-value" id="vent-peep">5</div>
+        <div class="vent-unit">cmH₂O</div>
+      </div>
+      <div class="vent-item">
+        <div class="vent-label">吸氧浓度 FiO₂</div>
+        <div class="vent-value" id="vent-fio2">40</div>
+        <div class="vent-unit">%</div>
+      </div>
+      <div class="vent-item">
+        <div class="vent-label">气道峰压 Ppeak</div>
+        <div class="vent-value" id="vent-ppeak">22</div>
+        <div class="vent-unit">cmH₂O</div>
+      </div>
+      <div class="vent-item">
+        <div class="vent-label">呼吸频率</div>
+        <div class="vent-value" id="vent-rr">14</div>
+        <div class="vent-unit">次/分</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 报警历史 -->
+  <div class="alarm-history">
+    <div class="panel-title">🔔 报警历史（最近5条）</div>
+    <div class="alarm-history-list" id="alarm-history-list"></div>
+  </div>
+</div>
+
+<!-- ===== 模块3：数据回顾 ===== -->
+<div id="module-review" class="module">
+  <!-- 时间选择器 -->
+  <div class="review-toolbar">
+    <label>开始时间</label>
+    <input type="datetime-local" id="time-start" value="2026-06-17T00:00">
+    <label>结束时间</label>
+    <input type="datetime-local" id="time-end" value="2026-06-17T23:59">
+    <button class="filter-btn active">查询</button>
+  </div>
+
+  <!-- 趋势图 -->
+  <div class="trend-panel">
+    <div class="panel-title" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>📈 24小时趋势图（HR / SpO₂）</span>
+      <div class="trend-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#00d4ff;"></div>HR (bpm)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#00ff88;"></div>SpO₂ (%)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ff3b3b; opacity:0.8;"></div>报警事件</div>
+      </div>
+    </div>
+    <canvas id="trendCanvas"></canvas>
+  </div>
+
+  <!-- 趋势数据表格 & 事件列表 -->
+  <div class="two-col">
+    <!-- 趋势数据表格 -->
+    <div class="review-table-panel">
+      <div class="panel-title">📋 每小时数据（24小时）</div>
+      <div style="max-height:360px; overflow-y:auto;">
+        <table class="data-table" id="trend-table">
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>HR</th>
+              <th>SpO₂</th>
+              <th>NIBP</th>
+              <th>RR</th>
+              <th>Temp</th>
+            </tr>
+          </thead>
+          <tbody id="trend-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 事件列表 -->
+    <div class="event-panel">
+      <div class="panel-title">📝 事件列表</div>
+      <div class="event-filter">
+        <button class="filter-btn active" onclick="filterEvents('all', this)">全部</button>
+        <button class="filter-btn" onclick="filterEvents('alarm', this)">报警</button>
+        <button class="filter-btn" onclick="filterEvents('op', this)">操作</button>
+        <button class="filter-btn" onclick="filterEvents('order', this)">医嘱</button>
+      </div>
+      <div class="event-list" id="event-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 模块4：报警事件 ===== -->
+<div id="module-alarm" class="module">
+  <!-- 统计卡片 -->
+  <div class="alarm-stats">
+    <div class="alarm-stat-card">
+      <div class="asc-label">今日报警总数</div>
+      <div class="asc-value total">47</div>
+      <div class="asc-sub">较昨日 ↑ 12%</div>
+    </div>
+    <div class="alarm-stat-card">
+      <div class="asc-label">已处理</div>
+      <div class="asc-value handled">34</div>
+      <div class="asc-sub">处理率 72%</div>
+    </div>
+    <div class="alarm-stat-card">
+      <div class="asc-label">未处理</div>
+      <div class="asc-value unhandled" id="unhandled-count">13</div>
+      <div class="asc-sub">需立即关注</div>
+    </div>
+    <div class="alarm-stat-card">
+      <div class="asc-label">平均响应时间</div>
+      <div class="asc-value resp">3.2</div>
+      <div class="asc-sub">分钟</div>
+    </div>
+  </div>
+
+  <!-- 报警列表 -->
+  <div class="alarm-list-panel">
+    <div class="panel-title" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>🔔 报警事件列表</span>
+      <span style="font-size:12px; color:var(--text-dim);">共 15 条</span>
+    </div>
+    <table class="alarm-table" id="alarm-table">
+      <thead>
+        <tr>
+          <th>时间</th>
+          <th>床位</th>
+          <th>患者</th>
+          <th>报警类型</th>
+          <th>级别</th>
+          <th>状态</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="alarm-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+/* ===== 患者数据模型 ===== */
+const PATIENTS = [
+  { bed: '床1', name: '张建国', age: 72, gender: '男', diag: '慢性心力衰竭急性加重', admit: '2026-06-15', status: 'ok', hr: 78, spo2: 97, sbp: 125, dbp: 78, rr: 16, temp: 36.8 },
+  { bed: '床2', name: '刘淑珍', age: 65, gender: '女', diag: '急性呼吸衰竭', admit: '2026-06-16', status: 'ok', hr: 82, spo2: 96, sbp: 118, dbp: 72, rr: 18, temp: 37.1 },
+  { bed: '床3', name: '王  浩', age: 58, gender: '男', diag: '脓毒性休克', admit: '2026-06-17', status: 'danger', hr: 138, spo2: 88, sbp: 82, dbp: 50, rr: 28, temp: 39.4 },
+  { bed: '床4', name: '陈美华', age: 49, gender: '女', diag: '重症肺炎', admit: '2026-06-14', status: 'ok', hr: 90, spo2: 95, sbp: 132, dbp: 84, rr: 20, temp: 37.9 },
+  { bed: '床5', name: '赵立明', age: 81, gender: '男', diag: '急性心肌梗死', admit: '2026-06-17', status: 'warn', hr: 108, spo2: 93, sbp: 155, dbp: 98, rr: 22, temp: 37.3 },
+  { bed: '床6', name: '孙晓红', age: 36, gender: '女', diag: '重型颅脑损伤', admit: '2026-06-12', status: 'ok', hr: 65, spo2: 98, sbp: 112, dbp: 68, rr: 14, temp: 36.5 },
+  { bed: '床7', name: '李国强', age: 67, gender: '男', diag: '多器官功能衰竭', admit: '2026-06-17', status: 'danger', hr: 145, spo2: 85, sbp: 75, dbp: 44, rr: 32, temp: 39.8 },
+  { bed: '床8', name: '周兰英', age: 55, gender: '女', diag: '急性胰腺炎', admit: '2026-06-16', status: 'ok', hr: 88, spo2: 97, sbp: 128, dbp: 80, rr: 17, temp: 37.0 },
+];
+
+/* ===== 当前选中患者 ===== */
+let selectedPatient = null;
+
+/* ===== 辅助函数 ===== */
+// 在某值基础上随机小幅偏移
+function jitter(v, range) {
+  return v + (Math.random() * 2 - 1) * range;
+}
+
+// 格式化数字为固定小数位
+function fmt(v, d = 0) {
+  return v.toFixed(d);
+}
+
+/* ===== Tab 切换 ===== */
+function switchTab(name) {
+  document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('module-' + name).classList.add('active');
+  const tabs = { dept: 0, patient: 1, review: 2, alarm: 3 };
+  document.querySelectorAll('.nav-tab')[tabs[name]].classList.add('active');
+
+  if (name === 'review') {
+    setTimeout(() => drawTrendChart(), 100);
+  }
+  if (name === 'patient') {
+    setTimeout(() => { startEcg(); updateDetailPanel(); }, 100);
+  }
+}
+
+/* ===== 模块1：科室大屏 ===== */
+function renderBedGrid() {
+  const grid = document.getElementById('bed-grid');
+  grid.innerHTML = '';
+  PATIENTS.forEach((p, i) => {
+    const card = document.createElement('div');
+    card.className = `bed-card status-${p.status}`;
+    card.id = `bed-card-${i}`;
+    card.onclick = () => openPatient(i);
+    card.innerHTML = `
+      <div class="bed-card-header">
+        <div>
+          <div class="bed-no">${p.bed}</div>
+          <div class="bed-patient">${p.name}</div>
+          <div class="bed-patient-sub">${p.age}岁 · ${p.gender} · ${p.diag}</div>
+        </div>
+        <span class="status-badge ${p.status === 'ok' ? 'ok' : p.status === 'warn' ? 'warn' : 'danger'}" id="badge-${i}">
+          ${p.status === 'ok' ? '正常' : p.status === 'warn' ? '警告' : '危急'}
+        </span>
+      </div>
+      <div class="vitals-grid">
+        <div class="vital-item">
+          <span class="vital-label">HR</span>
+          <span class="vital-value ${getVitalClass(p, 'hr')}" id="v-hr-${i}">${fmt(p.hr)}</span>
+          <span class="vital-unit">bpm</span>
+        </div>
+        <div class="vital-item">
+          <span class="vital-label">SpO₂</span>
+          <span class="vital-value ${getVitalClass(p, 'spo2')}" id="v-spo2-${i}">${fmt(p.spo2)}</span>
+          <span class="vital-unit">%</span>
+        </div>
+        <div class="vital-item">
+          <span class="vital-label">NIBP</span>
+          <span class="vital-value ${getVitalClass(p, 'nibp')}" id="v-nibp-${i}" style="font-size:13px">${fmt(p.sbp)}/${fmt(p.dbp)}</span>
+          <span class="vital-unit">mmHg</span>
+        </div>
+        <div class="vital-item">
+          <span class="vital-label">RR</span>
+          <span class="vital-value ${getVitalClass(p, 'rr')}" id="v-rr-${i}">${fmt(p.rr)}</span>
+          <span class="vital-unit">次/分</span>
+        </div>
+        <div class="vital-item">
+          <span class="vital-label">Temp</span>
+          <span class="vital-value ${getVitalClass(p, 'temp')}" id="v-temp-${i}">${fmt(p.temp, 1)}</span>
+          <span class="vital-unit">°C</span>
+        </div>
+        <div class="vital-item">
+          <span class="vital-label">状态</span>
+          <span class="vital-value" style="font-size:12px; color:var(--text-dim);">${p.admit}</span>
+          <span class="vital-unit">入院日期</span>
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+// 根据数值范围返回危险等级样式
+function getVitalClass(p, type) {
+  if (p.status === 'danger') return 'danger';
+  if (p.status === 'warn') {
+    if (type === 'hr' && (p.hr > 110 || p.hr < 50)) return 'warn';
+    if (type === 'spo2' && p.spo2 < 94) return 'warn';
+    if (type === 'nibp' && (p.sbp > 150 || p.sbp < 90)) return 'warn';
+    if (type === 'rr' && (p.rr > 24 || p.rr < 10)) return 'warn';
+    if (type === 'temp' && p.temp > 38.5) return 'warn';
+  }
+  return '';
+}
+
+// 每2秒更新数值
+function updateVitals() {
+  PATIENTS.forEach((p, i) => {
+    const isDanger = p.status === 'danger';
+    const isWarn = p.status === 'warn';
+
+    if (isDanger) {
+      p.hr = Math.max(120, Math.min(160, jitter(p.hr, 4)));
+      p.spo2 = Math.max(82, Math.min(90, jitter(p.spo2, 1)));
+      p.sbp = Math.max(70, Math.min(95, jitter(p.sbp, 3)));
+      p.dbp = Math.max(40, Math.min(60, jitter(p.dbp, 2)));
+      p.rr = Math.max(26, Math.min(36, jitter(p.rr, 2)));
+      p.temp = Math.max(38.8, Math.min(40.5, jitter(p.temp, 0.1)));
+    } else if (isWarn) {
+      p.hr = Math.max(95, Math.min(120, jitter(p.hr, 3)));
+      p.spo2 = Math.max(91, Math.min(95, jitter(p.spo2, 0.5)));
+      p.sbp = Math.max(140, Math.min(165, jitter(p.sbp, 3)));
+      p.dbp = Math.max(88, Math.min(105, jitter(p.dbp, 2)));
+      p.rr = Math.max(20, Math.min(26, jitter(p.rr, 1)));
+      p.temp = Math.max(37.0, Math.min(38.2, jitter(p.temp, 0.05)));
+    } else {
+      p.hr = Math.max(55, Math.min(95, jitter(p.hr, 2)));
+      p.spo2 = Math.max(95, Math.min(100, jitter(p.spo2, 0.5)));
+      p.sbp = Math.max(100, Math.min(140, jitter(p.sbp, 2)));
+      p.dbp = Math.max(60, Math.min(90, jitter(p.dbp, 2)));
+      p.rr = Math.max(12, Math.min(22, jitter(p.rr, 1)));
+      p.temp = Math.max(36.0, Math.min(37.8, jitter(p.temp, 0.05)));
+    }
+
+    const hrEl = document.getElementById(`v-hr-${i}`);
+    const spo2El = document.getElementById(`v-spo2-${i}`);
+    const nibpEl = document.getElementById(`v-nibp-${i}`);
+    const rrEl = document.getElementById(`v-rr-${i}`);
+    const tempEl = document.getElementById(`v-temp-${i}`);
+
+    if (hrEl) hrEl.textContent = fmt(p.hr);
+    if (spo2El) spo2El.textContent = fmt(p.spo2);
+    if (nibpEl) nibpEl.textContent = `${fmt(p.sbp)}/${fmt(p.dbp)}`;
+    if (rrEl) rrEl.textContent = fmt(p.rr);
+    if (tempEl) tempEl.textContent = fmt(p.temp, 1);
+
+    // 同步更新详情面板（如果当前选中该患者）
+    if (selectedPatient !== null && selectedPatient === i) {
+      updateDetailPanel();
+    }
+  });
+}
+
+/* ===== 模块2：单患者详情 ===== */
+function openPatient(index) {
+  selectedPatient = index;
+  switchTab('patient');
+}
+
+function updateDetailPanel() {
+  if (selectedPatient === null) return;
+  const p = PATIENTS[selectedPatient];
+  document.getElementById('detail-name').textContent = p.name;
+  document.getElementById('detail-diag').textContent = `诊断：${p.diag}`;
+  document.getElementById('detail-bed').textContent = p.bed;
+  document.getElementById('detail-age').textContent = `${p.age}岁 / ${p.gender}`;
+  document.getElementById('detail-admit').textContent = p.admit;
+  document.getElementById('detail-status').textContent =
+    p.status === 'ok' ? '✅ 正常' : p.status === 'warn' ? '⚠️ 警告' : '🆘 危急';
+
+  const cls = p.status === 'danger' ? 'danger' : p.status === 'warn' ? 'warn' : '';
+  ['bv-hr', 'bv-spo2', 'bv-nibp', 'bv-rr', 'bv-temp'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.className = 'bv-value ' + cls; }
+  });
+
+  document.getElementById('bv-hr').textContent = fmt(p.hr);
+  document.getElementById('bv-spo2').textContent = fmt(p.spo2);
+  document.getElementById('bv-nibp').textContent = `${fmt(p.sbp)}/${fmt(p.dbp)}`;
+  document.getElementById('bv-rr').textContent = fmt(p.rr);
+  document.getElementById('bv-temp').textContent = fmt(p.temp, 1);
+  document.getElementById('ecg-hr-label').textContent = fmt(p.hr);
+}
+
+/* --- ECG Canvas 动画 --- */
+let ecgAnim = null;
+let ecgPhase = 0;
+let ecgData = [];
+const ECG_POINTS = 500;
+
+// ECG波形模板（简化的PQRST模板）
+function ecgTemplate(t) {
+  // 规范化时间 0~1 对应一个心跳周期
+  const x = (t % 1 + 1) % 1;
+  // P波
+  let v = 0.08 * Math.exp(-((x - 0.15) ** 2) / 0.001);
+  // QRS波群
+  v -= 0.05 * Math.exp(-((x - 0.28) ** 2) / 0.0003);
+  v += 0.9 * Math.exp(-((x - 0.31) ** 2) / 0.00008);
+  v -= 0.15 * Math.exp(-((x - 0.35) ** 2) / 0.0003);
+  // T波
+  v += 0.12 * Math.exp(-((x - 0.55) ** 2) / 0.004);
+  return v;
+}
+
+function startEcg() {
+  if (ecgAnim) cancelAnimationFrame(ecgAnim);
+  ecgData = new Array(ECG_POINTS).fill(0);
+
+  const canvas = document.getElementById('ecgCanvas');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width || 800;
+  canvas.height = 200;
+  const ctx = canvas.getContext('2d');
+
+  let speed = 2; // pixels per frame
+
+  function draw() {
+    const p = selectedPatient !== null ? PATIENTS[selectedPatient] : PATIENTS[0];
+    // 心率影响周期
+    const bps = (p ? p.hr : 75) / 60;
+    const cycleLen = Math.round(60 / bps); // 像素数/心跳
+
+    // 滚动：移除最旧数据，添加新数据
+    for (let s = 0; s < speed; s++) {
+      ecgPhase += 1 / cycleLen;
+      const noise = (Math.random() - 0.5) * 0.02;
+      ecgData.shift();
+      ecgData.push(ecgTemplate(ecgPhase) + noise);
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#050a14';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 网格线
+    ctx.strokeStyle = 'rgba(0,212,255,0.07)';
+    ctx.lineWidth = 1;
+    const gridW = canvas.width / 20;
+    const gridH = canvas.height / 8;
+    for (let gx = 0; gx <= 20; gx++) {
+      ctx.beginPath(); ctx.moveTo(gx * gridW, 0); ctx.lineTo(gx * gridW, canvas.height); ctx.stroke();
+    }
+    for (let gy = 0; gy <= 8; gy++) {
+      ctx.beginPath(); ctx.moveTo(0, gy * gridH); ctx.lineTo(canvas.width, gy * gridH); ctx.stroke();
+    }
+
+    // 基线
+    const mid = canvas.height / 2;
+    const amp = canvas.height * 0.38;
+
+    // ECG 波形
+    const isDanger = p && p.status === 'danger';
+    ctx.strokeStyle = isDanger ? '#ff3b3b' : '#00ff88';
+    ctx.lineWidth = 2;
+    ctx.shadowBlur = isDanger ? 8 : 4;
+    ctx.shadowColor = isDanger ? '#ff3b3b' : '#00ff88';
+    ctx.beginPath();
+    const step = canvas.width / ECG_POINTS;
+    ecgData.forEach((v, i) => {
+      const x = i * step;
+      const y = mid - v * amp;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // 扫描线（滚动头部高亮）
+    const scanX = (ecgData.length - 1) * step;
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(scanX, 0);
+    ctx.lineTo(scanX, canvas.height);
+    ctx.stroke();
+
+    ecgAnim = requestAnimationFrame(draw);
+  }
+
+  draw();
+}
+
+/* --- 报警历史 --- */
+const ALARM_HISTORY_DATA = [
+  { time: '14:22:05', level: 'danger', desc: 'SpO₂ 低于 90%，氧饱和度危急下降' },
+  { time: '13:55:18', level: 'danger', desc: 'HR 超过 140 bpm，心动过速' },
+  { time: '13:30:44', level: 'warn', desc: '收缩压 > 160 mmHg，血压偏高' },
+  { time: '12:48:02', level: 'warn', desc: '体温 38.8°C，发热警告' },
+  { time: '11:20:33', level: 'info', desc: '呼吸机参数调整：FiO₂ 40%→50%' },
+];
+
+function renderAlarmHistory() {
+  const list = document.getElementById('alarm-history-list');
+  list.innerHTML = ALARM_HISTORY_DATA.map(a => `
+    <div class="alarm-history-item">
+      <span class="ah-time">${a.time}</span>
+      <span class="ah-level ${a.level}">${a.level === 'danger' ? '危急' : a.level === 'warn' ? '警告' : '提示'}</span>
+      <span class="ah-desc">${a.desc}</span>
+    </div>
+  `).join('');
+}
+
+/* ===== 模块3：数据回顾 ===== */
+
+// 生成24小时模拟数据
+const TREND_DATA = (() => {
+  const rows = [];
+  for (let h = 0; h < 24; h++) {
+    const hour = String(h).padStart(2, '0') + ':00';
+    // 模拟凌晨有异常事件
+    const isAbnormal = h >= 3 && h <= 4;
+    const hr = isAbnormal ? Math.floor(130 + Math.random() * 20) : Math.floor(70 + Math.random() * 20);
+    const spo2 = isAbnormal ? Math.floor(86 + Math.random() * 4) : Math.floor(95 + Math.random() * 5);
+    const sbp = isAbnormal ? Math.floor(80 + Math.random() * 15) : Math.floor(110 + Math.random() * 30);
+    const dbp = isAbnormal ? Math.floor(45 + Math.random() * 10) : Math.floor(65 + Math.random() * 20);
+    const rr = isAbnormal ? Math.floor(26 + Math.random() * 8) : Math.floor(14 + Math.random() * 8);
+    const temp = isAbnormal ? (38.8 + Math.random() * 0.8).toFixed(1) : (36.5 + Math.random() * 1).toFixed(1);
+    rows.push({ hour, hr, spo2, sbp, dbp, rr, temp, isAbnormal });
+  }
+  return rows;
+})();
+
+// 报警事件时间点（小时）
+const ALARM_EVENTS_HOURS = [3, 4, 11, 17];
+
+function drawTrendChart() {
+  const canvas = document.getElementById('trendCanvas');
+  const container = canvas.parentElement;
+  canvas.width = container.clientWidth - 32;
+  canvas.height = 260;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const padL = 48, padR = 20, padT = 20, padB = 36;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+  const n = TREND_DATA.length; // 24
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#050a14';
+  ctx.fillRect(0, 0, W, H);
+
+  // 网格
+  ctx.strokeStyle = 'rgba(30,45,74,0.7)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 6; i++) {
+    const y = padT + (chartH / 6) * i;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + chartW, y); ctx.stroke();
+  }
+  for (let i = 0; i < n; i++) {
+    const x = padL + (chartW / (n - 1)) * i;
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + chartH); ctx.stroke();
+  }
+
+  // HR 折线 (范围 40-180)
+  function hrY(v) { return padT + chartH - ((v - 40) / 140) * chartH; }
+  // SpO2 折线 (范围 70-105)
+  function spo2Y(v) { return padT + chartH - ((v - 70) / 35) * chartH; }
+
+  // 绘制报警竖线
+  ALARM_EVENTS_HOURS.forEach(h => {
+    const x = padL + (chartW / (n - 1)) * h;
+    ctx.strokeStyle = 'rgba(255,59,59,0.6)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + chartH); ctx.stroke();
+    ctx.setLineDash([]);
+    // 标签
+    ctx.fillStyle = 'rgba(255,59,59,0.8)';
+    ctx.font = '10px monospace';
+    ctx.fillText('⚠', x - 5, padT + 12);
+  });
+
+  // HR 折线
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 2;
+  ctx.shadowBlur = 4;
+  ctx.shadowColor = '#00d4ff';
+  ctx.beginPath();
+  TREND_DATA.forEach((d, i) => {
+    const x = padL + (chartW / (n - 1)) * i;
+    const y = hrY(d.hr);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // HR 数据点
+  ctx.fillStyle = '#00d4ff';
+  TREND_DATA.forEach((d, i) => {
+    const x = padL + (chartW / (n - 1)) * i;
+    ctx.beginPath();
+    ctx.arc(x, hrY(d.hr), d.isAbnormal ? 5 : 3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // SpO2 折线
+  ctx.strokeStyle = '#00ff88';
+  ctx.shadowColor = '#00ff88';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  TREND_DATA.forEach((d, i) => {
+    const x = padL + (chartW / (n - 1)) * i;
+    const y = spo2Y(d.spo2);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // X轴刻度标签
+  ctx.fillStyle = '#5a7a9a';
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'center';
+  [0, 4, 8, 12, 16, 20, 23].forEach(h => {
+    const x = padL + (chartW / (n - 1)) * h;
+    ctx.fillText(String(h).padStart(2, '0') + ':00', x, H - 8);
+  });
+
+  // Y轴标签（左侧）
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#00d4ff';
+  [60, 80, 100, 120, 140].forEach(v => {
+    ctx.fillText(v, padL - 4, hrY(v) + 4);
+  });
+}
+
+function renderTrendTable() {
+  const tbody = document.getElementById('trend-tbody');
+  tbody.innerHTML = TREND_DATA.map(d => `
+    <tr class="${d.isAbnormal ? 'abnormal' : ''}">
+      <td>${d.hour}</td>
+      <td>${d.hr}</td>
+      <td>${d.spo2}%</td>
+      <td>${d.sbp}/${d.dbp}</td>
+      <td>${d.rr}</td>
+      <td>${d.temp}°C</td>
+    </tr>
+  `).join('');
+}
+
+// 10条事件数据
+const EVENTS_DATA = [
+  { time: '03:22', type: 'alarm', desc: 'SpO₂ 危急下降至 86%，自动触发报警' },
+  { time: '03:35', type: 'op', desc: '护士调整呼吸机参数，FiO₂ 提升至 60%' },
+  { time: '03:55', type: 'alarm', desc: 'HR 超过 140 bpm，持续 5 分钟' },
+  { time: '04:10', type: 'order', desc: '医嘱：去甲肾上腺素 0.2μg/kg/min 静脉泵入' },
+  { time: '04:30', type: 'op', desc: '医生到场查看患者，调整镇痛镇静方案' },
+  { time: '07:00', type: 'order', desc: '医嘱：抽血复查血气分析' },
+  { time: '08:30', type: 'op', desc: '护士翻身拍背，体位引流' },
+  { time: '11:15', type: 'alarm', desc: '体温 38.9°C，发热报警' },
+  { time: '13:00', type: 'order', desc: '医嘱：物理降温，冰毯降温' },
+  { time: '17:45', type: 'alarm', desc: '血压下降 78/45 mmHg，危急报警' },
+];
+
+let currentFilter = 'all';
+
+function renderEvents(filter) {
+  const list = document.getElementById('event-list');
+  const filtered = filter === 'all' ? EVENTS_DATA : EVENTS_DATA.filter(e => e.type === filter);
+  list.innerHTML = filtered.map(e => `
+    <div class="event-item">
+      <span class="ev-time">${e.time}</span>
+      <span class="ev-type ${e.type}-type">${e.type === 'alarm' ? '报警' : e.type === 'op' ? '操作' : '医嘱'}</span>
+      <span class="ev-desc">${e.desc}</span>
+    </div>
+  `).join('');
+}
+
+function filterEvents(type, btn) {
+  currentFilter = type;
+  document.querySelectorAll('.event-filter .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderEvents(type);
+}
+
+/* ===== 模块4：报警事件 ===== */
+const ALARMS_DATA = [
+  { id: 1, time: '17:45:12', bed: '床7', patient: '李国强', type: 'SpO₂ 危急下降', level: 'critical', handled: false },
+  { id: 2, time: '17:42:33', bed: '床3', patient: '王  浩', type: '心动过速 HR>140', level: 'critical', handled: false },
+  { id: 3, time: '17:38:55', bed: '床7', patient: '李国强', type: '血压危急下降', level: 'critical', handled: false },
+  { id: 4, time: '17:22:08', bed: '床5', patient: '赵立明', type: '收缩压 > 160 mmHg', level: 'warning', handled: false },
+  { id: 5, time: '16:55:44', bed: '床3', patient: '王  浩', type: '体温 > 39°C', level: 'warning', handled: false },
+  { id: 6, time: '16:30:21', bed: '床5', patient: '赵立明', type: 'HR > 110 bpm', level: 'warning', handled: true },
+  { id: 7, time: '15:48:17', bed: '床2', patient: '刘淑珍', type: 'SpO₂ < 95%', level: 'info', handled: true },
+  { id: 8, time: '15:20:03', bed: '床7', patient: '李国强', type: 'RR > 30 次/分', level: 'critical', handled: false },
+  { id: 9, time: '14:22:38', bed: '床3', patient: '王  浩', type: 'SpO₂ < 90%', level: 'critical', handled: true },
+  { id: 10, time: '13:55:19', bed: '床7', patient: '李国强', type: '心动过速报警', level: 'critical', handled: true },
+  { id: 11, time: '13:30:52', bed: '床5', patient: '赵立明', type: '血压偏高', level: 'warning', handled: true },
+  { id: 12, time: '12:48:04', bed: '床3', patient: '王  浩', type: '发热 38.8°C', level: 'warning', handled: true },
+  { id: 13, time: '11:15:29', bed: '床3', patient: '王  浩', type: '体温报警', level: 'warning', handled: false },
+  { id: 14, time: '09:30:10', bed: '床1', patient: '张建国', type: '心率偏慢', level: 'info', handled: true },
+  { id: 15, time: '08:22:45', bed: '床4', patient: '陈美华', type: 'SpO₂ 临界值', level: 'info', handled: true },
+];
+
+function renderAlarmTable() {
+  const tbody = document.getElementById('alarm-tbody');
+  tbody.innerHTML = ALARMS_DATA.map(a => `
+    <tr class="${a.handled ? '' : 'unhandled'}" id="alarm-row-${a.id}">
+      <td style="font-family:monospace">${a.time}</td>
+      <td>${a.bed}</td>
+      <td>${a.patient}</td>
+      <td>${a.type}</td>
+      <td><span class="level-badge ${a.level === 'critical' ? 'critical' : a.level === 'warning' ? 'warning' : 'info'}">${a.level === 'critical' ? '危急' : a.level === 'warning' ? '警告' : '提示'}</span></td>
+      <td>
+        <span class="status-dot ${a.handled ? 'handled' : 'unhandled'}"></span>
+        ${a.handled ? '已处理' : '未处理'}
+      </td>
+      <td>
+        <button class="handle-btn" id="handle-btn-${a.id}" onclick="handleAlarm(${a.id})" ${a.handled ? 'disabled' : ''}>
+          ${a.handled ? '已处理' : '处理'}
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function handleAlarm(id) {
+  const alarm = ALARMS_DATA.find(a => a.id === id);
+  if (!alarm || alarm.handled) return;
+  alarm.handled = true;
+
+  // 更新对应行
+  const row = document.getElementById(`alarm-row-${id}`);
+  if (row) {
+    row.classList.remove('unhandled');
+    const btn = document.getElementById(`handle-btn-${id}`);
+    if (btn) { btn.textContent = '已处理'; btn.disabled = true; }
+    // 更新状态单元格
+    const cells = row.querySelectorAll('td');
+    if (cells[5]) {
+      cells[5].innerHTML = '<span class="status-dot handled"></span>已处理';
+    }
+  }
+
+  // 更新未处理计数
+  const unhandled = ALARMS_DATA.filter(a => !a.handled).length;
+  const countEl = document.getElementById('unhandled-count');
+  if (countEl) countEl.textContent = unhandled;
+}
+
+/* ===== 时钟 ===== */
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const s = String(now.getSeconds()).padStart(2, '0');
+  const el = document.getElementById('dept-clock');
+  if (el) el.textContent = `${h}:${m}:${s}`;
+}
+
+/* ===== 初始化 ===== */
+function init() {
+  renderBedGrid();
+  renderAlarmHistory();
+  renderTrendTable();
+  renderEvents('all');
+  renderAlarmTable();
+  updateClock();
+
+  // 定时任务
+  setInterval(updateClock, 1000);
+  setInterval(updateVitals, 2000);
+}
+
+// 页面加载完成后初始化
+window.addEventListener('load', init);
+
+// 窗口调整大小时重绘趋势图
+window.addEventListener('resize', () => {
+  const module = document.getElementById('module-review');
+  if (module && module.classList.contains('active')) {
+    drawTrendChart();
+  }
+  const ecgModule = document.getElementById('module-patient');
+  if (ecgModule && ecgModule.classList.contains('active')) {
+    const canvas = document.getElementById('ecgCanvas');
+    if (canvas) {
+      canvas.width = canvas.parentElement.clientWidth;
+    }
+  }
+});
+</script>
+</body>
+</html>
