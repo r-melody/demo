@@ -1040,7 +1040,7 @@ function switchTab(name) {
     // 切换到数据回顾模块时，按当前时间选择器的值绘制趋势图
     setTimeout(() => {
       const start = document.getElementById('time-start').value || '2026-06-01T00:00';
-      const end   = document.getElementById('time-end').value   || '2026-06-07T23:59';
+      const end   = document.getElementById('time-end').value   || '2026-07-12T23:59';
       drawTrendChart(start, end);
     }, 100);
   }
@@ -1445,9 +1445,11 @@ function drawTrendChart(start, end) {
     const y = padT + (chartH / 6) * i;
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + chartW, y); ctx.stroke();
   }
-  const xStep = n > 1 ? chartW / (n - 1) : chartW;
+  // 单点时居中显示，多点时均匀分布；xOffset 用于单点居中偏移
+  const xStep   = n > 1 ? chartW / (n - 1) : chartW;
+  const xOffset = n === 1 ? chartW / 2 : 0;
   for (let i = 0; i < n; i++) {
-    const x = padL + xStep * i;
+    const x = padL + xOffset + xStep * i;
     ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + chartH); ctx.stroke();
   }
 
@@ -1461,7 +1463,7 @@ function drawTrendChart(start, end) {
     const dateOfDh = dh.slice(0, 10);
     const idx = days.indexOf(dateOfDh);
     if (idx === -1) return;
-    const x = padL + xStep * idx;
+    const x = padL + xOffset + xStep * idx;
     ctx.strokeStyle = 'rgba(255,59,59,0.6)';
     ctx.lineWidth = 1.5;
     ctx.setLineDash([4, 4]);
@@ -1480,7 +1482,7 @@ function drawTrendChart(start, end) {
   ctx.shadowColor = '#00d4ff';
   ctx.beginPath();
   chartData.forEach((d, i) => {
-    const x = padL + xStep * i;
+    const x = padL + xOffset + xStep * i;
     const y = hrY(d.hr);
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
@@ -1489,7 +1491,7 @@ function drawTrendChart(start, end) {
   // HR 数据点
   ctx.fillStyle = '#00d4ff';
   chartData.forEach((d, i) => {
-    const x = padL + xStep * i;
+    const x = padL + xOffset + xStep * i;
     ctx.beginPath();
     ctx.arc(x, hrY(d.hr), d.isAbnormal ? 5 : 3, 0, Math.PI * 2);
     ctx.fill();
@@ -1501,7 +1503,7 @@ function drawTrendChart(start, end) {
   ctx.lineWidth = 2;
   ctx.beginPath();
   chartData.forEach((d, i) => {
-    const x = padL + xStep * i;
+    const x = padL + xOffset + xStep * i;
     const y = spo2Y(d.spo2);
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
@@ -1515,7 +1517,7 @@ function drawTrendChart(start, end) {
   const labelStep = Math.max(1, Math.ceil(n / 10));
   days.forEach((date, i) => {
     if (i % labelStep !== 0 && i !== n - 1) return;
-    const x = padL + xStep * i;
+    const x = padL + xOffset + xStep * i;
     const label = date.slice(5).replace('-', '/'); // MM/DD
     ctx.fillText(label, x, H - 8);
   });
@@ -1534,8 +1536,10 @@ function drawTrendChart(start, end) {
 function renderTrendTable(start, end) {
   if (!start) start = '2026-06-01T00:00';
   if (!end)   end   = '2026-06-07T23:59';
+  // 数据只按小时记录（HH:00），将开始/结束时间向下取整到整点进行比较
+  // endKey 末位改为 :59 以确保包含当前小时内的所有整点记录
   const startKey = start.replace('T', ' ').slice(0, 13) + ':00'; // YYYY-MM-DD HH:00
-  const endKey   = end.replace('T', ' ').slice(0, 13)   + ':59';
+  const endKey   = end.replace('T', ' ').slice(0, 13)   + ':59'; // YYYY-MM-DD HH:59（包含当前整点）
   const filtered = TREND_DATA.filter(d => d.dateHour >= startKey && d.dateHour <= endKey);
   const tbody = document.getElementById('trend-tbody');
   tbody.innerHTML = filtered.map(d => `
@@ -1712,7 +1716,7 @@ function init() {
   renderAlarmHistory();
   // 数据回顾模块默认展示前7天数据
   renderTrendTable('2026-06-01T00:00', '2026-06-07T23:59');
-  renderEvents('all', '2026-06-01', '2026-07-12');
+  renderEvents('all', '2026-06-01T00:00', '2026-07-12T23:59');
   renderAlarmTable();
   updateClock();
 
@@ -1730,7 +1734,7 @@ window.addEventListener('resize', () => {
   if (module && module.classList.contains('active')) {
     // 调整大小时使用当前时间选择器的值重绘
     const start = document.getElementById('time-start').value || '2026-06-01T00:00';
-    const end   = document.getElementById('time-end').value   || '2026-06-07T23:59';
+    const end   = document.getElementById('time-end').value   || '2026-07-12T23:59';
     drawTrendChart(start, end);
   }
   const ecgModule = document.getElementById('module-patient');
