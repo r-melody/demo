@@ -898,16 +898,16 @@ canvas#trendCanvas {
   <!-- 时间选择器 -->
   <div class="review-toolbar">
     <label>开始时间</label>
-    <input type="datetime-local" id="time-start" value="2026-06-17T00:00">
+    <input type="datetime-local" id="time-start" value="2026-06-01T00:00">
     <label>结束时间</label>
-    <input type="datetime-local" id="time-end" value="2026-06-17T23:59">
-    <button class="filter-btn active">查询</button>
+    <input type="datetime-local" id="time-end" value="2026-07-12T23:59">
+    <button class="filter-btn active" onclick="onQueryClick()">查询</button>
   </div>
 
   <!-- 趋势图 -->
   <div class="trend-panel">
     <div class="panel-title" style="display:flex; align-items:center; justify-content:space-between;">
-      <span>📈 24小时趋势图（HR / SpO₂）</span>
+      <span>📈 趋势图（HR / SpO₂）</span>
       <div class="trend-legend">
         <div class="legend-item"><div class="legend-dot" style="background:#00d4ff;"></div>HR (bpm)</div>
         <div class="legend-item"><div class="legend-dot" style="background:#00ff88;"></div>SpO₂ (%)</div>
@@ -919,14 +919,13 @@ canvas#trendCanvas {
 
   <!-- 趋势数据表格 & 事件列表 -->
   <div class="two-col">
-    <!-- 趋势数据表格 -->
     <div class="review-table-panel">
-      <div class="panel-title">📋 每小时数据（24小时）</div>
-      <div style="max-height:360px; overflow-y:auto;">
+      <div class="panel-title">📋 逐小时数据</div>
+      <div style="max-height:400px; overflow-y:auto;">
         <table class="data-table" id="trend-table">
           <thead>
             <tr>
-              <th>时间</th>
+              <th>日期时间</th>
               <th>HR</th>
               <th>SpO₂</th>
               <th>NIBP</th>
@@ -1038,7 +1037,12 @@ function switchTab(name) {
   document.querySelectorAll('.nav-tab')[tabs[name]].classList.add('active');
 
   if (name === 'review') {
-    setTimeout(() => drawTrendChart(), 100);
+    // 切换到数据回顾模块时，按当前时间选择器的值绘制趋势图
+    setTimeout(() => {
+      const start = document.getElementById('time-start').value || '2026-06-01T00:00';
+      const end   = document.getElementById('time-end').value   || '2026-07-12T23:59';
+      drawTrendChart(start, end);
+    }, 100);
   }
   if (name === 'patient') {
     setTimeout(() => { startEcg(); updateDetailPanel(); }, 100);
@@ -1316,44 +1320,123 @@ function renderAlarmHistory() {
 
 /* ===== 模块3：数据回顾 ===== */
 
-// 生成24小时模拟数据
+// 生成 2026-06-01 至 2026-07-12 共42天、每天24小时的模拟数据（共1008条）
 const TREND_DATA = (() => {
   const rows = [];
-  for (let h = 0; h < 24; h++) {
-    const hour = String(h).padStart(2, '0') + ':00';
-    // 模拟凌晨有异常事件
-    const isAbnormal = h >= 3 && h <= 4;
-    const hr = isAbnormal ? Math.floor(130 + Math.random() * 20) : Math.floor(70 + Math.random() * 20);
-    const spo2 = isAbnormal ? Math.floor(86 + Math.random() * 4) : Math.floor(95 + Math.random() * 5);
-    const sbp = isAbnormal ? Math.floor(80 + Math.random() * 15) : Math.floor(110 + Math.random() * 30);
-    const dbp = isAbnormal ? Math.floor(45 + Math.random() * 10) : Math.floor(65 + Math.random() * 20);
-    const rr = isAbnormal ? Math.floor(26 + Math.random() * 8) : Math.floor(14 + Math.random() * 8);
-    const temp = isAbnormal ? (38.8 + Math.random() * 0.8).toFixed(1) : (36.5 + Math.random() * 1).toFixed(1);
-    rows.push({ hour, hr, spo2, sbp, dbp, rr, temp, isAbnormal });
+  const startDate = new Date('2026-06-01T00:00:00');
+  // 异常时段：约每3-5天出现一次，每次持续1-3小时
+  const abnormalSlots = new Set();
+  let day = 0;
+  while (day < 42) {
+    // 随机间隔3-5天
+    day += 3 + Math.floor(Math.random() * 3);
+    if (day >= 42) break;
+    const startHour = Math.floor(Math.random() * 22); // 异常起始小时
+    const duration = 1 + Math.floor(Math.random() * 3); // 持续1-3小时
+    for (let dh = 0; dh < duration; dh++) {
+      abnormalSlots.add(day * 24 + startHour + dh);
+    }
+  }
+
+  for (let d = 0; d < 42; d++) {
+    const dateObj = new Date(startDate.getTime() + d * 86400000);
+    const yyyy = dateObj.getFullYear();
+    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const dd = String(dateObj.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+    for (let h = 0; h < 24; h++) {
+      const idx = d * 24 + h;
+      const hourStr = String(h).padStart(2, '0') + ':00';
+      const isAbnormal = abnormalSlots.has(idx);
+      // 正常时段：HR 65-95, SpO2 94-100, SBP 105-140, DBP 65-90, RR 13-22, Temp 36.2-37.8
+      // 异常时段：HR 125-155, SpO2 82-90, SBP 70-90, DBP 40-58, RR 27-36, Temp 38.6-40.2
+      const hr   = isAbnormal ? Math.floor(125 + Math.random() * 30) : Math.floor(65 + Math.random() * 30);
+      const spo2 = isAbnormal ? Math.floor(82  + Math.random() * 8)  : Math.floor(94 + Math.random() * 6);
+      const sbp  = isAbnormal ? Math.floor(70  + Math.random() * 20) : Math.floor(105 + Math.random() * 35);
+      const dbp  = isAbnormal ? Math.floor(40  + Math.random() * 18) : Math.floor(65 + Math.random() * 25);
+      const rr   = isAbnormal ? Math.floor(27  + Math.random() * 9)  : Math.floor(13 + Math.random() * 9);
+      const temp = isAbnormal ? (38.6 + Math.random() * 1.6).toFixed(1) : (36.2 + Math.random() * 1.6).toFixed(1);
+      rows.push({
+        date:     dateStr,
+        hour:     hourStr,
+        dateHour: `${dateStr} ${hourStr}`,
+        hr, spo2, sbp, dbp, rr, temp,
+        isAbnormal
+      });
+    }
   }
   return rows;
 })();
 
-// 报警事件时间点（小时）
-const ALARM_EVENTS_HOURS = [3, 4, 11, 17];
+// 从42天数据中随机标注约15个报警事件时间点（dateHour 字符串）
+const ALARM_EVENTS_POINTS = (() => {
+  const points = [];
+  const usedIdx = new Set();
+  while (points.length < 15) {
+    const idx = Math.floor(Math.random() * TREND_DATA.length);
+    if (!usedIdx.has(idx)) {
+      usedIdx.add(idx);
+      points.push(TREND_DATA[idx].dateHour);
+    }
+  }
+  return points.sort();
+})();
 
-function drawTrendChart() {
+/**
+ * 绘制趋势图，根据 start/end（YYYY-MM-DDTHH:mm）过滤数据
+ * 默认展示 2026-06-01 至 2026-06-07（前7天）
+ */
+function drawTrendChart(start, end) {
+  // 默认展示前7天
+  if (!start) start = '2026-06-01T00:00';
+  if (!end)   end   = '2026-06-07T23:59';
+
+  // 根据日期范围过滤数据（每天取第一个点代表该天，用于折线图按日聚合）
+  const startDay = start.slice(0, 10);
+  const endDay   = end.slice(0, 10);
+
+  // 按天聚合：取每天最后一个小时的数据点（或均值）
+  const dayMap = {};
+  TREND_DATA.forEach(d => {
+    if (d.date >= startDay && d.date <= endDay) {
+      if (!dayMap[d.date]) dayMap[d.date] = [];
+      dayMap[d.date].push(d);
+    }
+  });
+
+  // 按日期排序，每天取均值
+  const days = Object.keys(dayMap).sort();
+  const chartData = days.map(date => {
+    const recs = dayMap[date];
+    const avgHr   = Math.round(recs.reduce((s, r) => s + r.hr,   0) / recs.length);
+    const avgSpo2 = Math.round(recs.reduce((s, r) => s + r.spo2, 0) / recs.length);
+    const hasAbnormal = recs.some(r => r.isAbnormal);
+    return { date, hr: avgHr, spo2: avgSpo2, isAbnormal: hasAbnormal };
+  });
+
   const canvas = document.getElementById('trendCanvas');
   const container = canvas.parentElement;
-  // 减去面板内边距（左右各16px = 32px），确保 canvas 不超出容器宽度
   const CHART_PADDING = 32;
-  canvas.width = container.clientWidth - CHART_PADDING;
+  canvas.width  = container.clientWidth - CHART_PADDING;
   canvas.height = 260;
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
   const padL = 48, padR = 20, padT = 20, padB = 36;
   const chartW = W - padL - padR;
   const chartH = H - padT - padB;
-  const n = TREND_DATA.length; // 24
+  const n = chartData.length;
 
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = '#050a14';
   ctx.fillRect(0, 0, W, H);
+
+  if (n === 0) {
+    ctx.fillStyle = '#5a7a9a';
+    ctx.font = '14px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('无数据', W / 2, H / 2);
+    return;
+  }
 
   // 网格
   ctx.strokeStyle = 'rgba(30,45,74,0.7)';
@@ -1362,28 +1445,34 @@ function drawTrendChart() {
     const y = padT + (chartH / 6) * i;
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + chartW, y); ctx.stroke();
   }
+  // 单点时居中显示，多点时均匀分布；xOffset 用于单点居中偏移
+  const xStep   = n > 1 ? chartW / (n - 1) : chartW;
+  const xOffset = n === 1 ? chartW / 2 : 0;
   for (let i = 0; i < n; i++) {
-    const x = padL + (chartW / (n - 1)) * i;
+    const x = padL + xOffset + xStep * i;
     ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + chartH); ctx.stroke();
   }
 
   // HR 折线 (范围 40-180)
-  function hrY(v) { return padT + chartH - ((v - 40) / 140) * chartH; }
+  function hrY(v)   { return padT + chartH - ((v - 40)  / 140) * chartH; }
   // SpO2 折线 (范围 70-105)
-  function spo2Y(v) { return padT + chartH - ((v - 70) / 35) * chartH; }
+  function spo2Y(v) { return padT + chartH - ((v - 70)  / 35)  * chartH; }
 
-  // 绘制报警竖线
-  ALARM_EVENTS_HOURS.forEach(h => {
-    const x = padL + (chartW / (n - 1)) * h;
+  // 绘制当前范围内的报警事件竖线
+  ALARM_EVENTS_POINTS.forEach(dh => {
+    const dateOfDh = dh.slice(0, 10);
+    const idx = days.indexOf(dateOfDh);
+    if (idx === -1) return;
+    const x = padL + xOffset + xStep * idx;
     ctx.strokeStyle = 'rgba(255,59,59,0.6)';
     ctx.lineWidth = 1.5;
     ctx.setLineDash([4, 4]);
     ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + chartH); ctx.stroke();
     ctx.setLineDash([]);
-    // 标签
     ctx.fillStyle = 'rgba(255,59,59,0.8)';
     ctx.font = '10px monospace';
-    ctx.fillText('⚠', x - 5, padT + 12);
+    ctx.textAlign = 'center';
+    ctx.fillText('⚠', x, padT + 12);
   });
 
   // HR 折线
@@ -1392,8 +1481,8 @@ function drawTrendChart() {
   ctx.shadowBlur = 4;
   ctx.shadowColor = '#00d4ff';
   ctx.beginPath();
-  TREND_DATA.forEach((d, i) => {
-    const x = padL + (chartW / (n - 1)) * i;
+  chartData.forEach((d, i) => {
+    const x = padL + xOffset + xStep * i;
     const y = hrY(d.hr);
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
@@ -1401,8 +1490,8 @@ function drawTrendChart() {
 
   // HR 数据点
   ctx.fillStyle = '#00d4ff';
-  TREND_DATA.forEach((d, i) => {
-    const x = padL + (chartW / (n - 1)) * i;
+  chartData.forEach((d, i) => {
+    const x = padL + xOffset + xStep * i;
     ctx.beginPath();
     ctx.arc(x, hrY(d.hr), d.isAbnormal ? 5 : 3, 0, Math.PI * 2);
     ctx.fill();
@@ -1413,24 +1502,27 @@ function drawTrendChart() {
   ctx.shadowColor = '#00ff88';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  TREND_DATA.forEach((d, i) => {
-    const x = padL + (chartW / (n - 1)) * i;
+  chartData.forEach((d, i) => {
+    const x = padL + xOffset + xStep * i;
     const y = spo2Y(d.spo2);
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
   ctx.stroke();
   ctx.shadowBlur = 0;
 
-  // X轴刻度标签
+  // X 轴刻度标签（显示日期 MM/DD，最多显示10个标签防止拥挤）
   ctx.fillStyle = '#5a7a9a';
-  ctx.font = '11px monospace';
+  ctx.font = '10px monospace';
   ctx.textAlign = 'center';
-  [0, 4, 8, 12, 16, 20, 23].forEach(h => {
-    const x = padL + (chartW / (n - 1)) * h;
-    ctx.fillText(String(h).padStart(2, '0') + ':00', x, H - 8);
+  const labelStep = Math.max(1, Math.ceil(n / 10));
+  days.forEach((date, i) => {
+    if (i % labelStep !== 0 && i !== n - 1) return;
+    const x = padL + xOffset + xStep * i;
+    const label = date.slice(5).replace('-', '/'); // MM/DD
+    ctx.fillText(label, x, H - 8);
   });
 
-  // Y轴标签（左侧）
+  // Y 轴标签（左侧，HR 值）
   ctx.textAlign = 'right';
   ctx.fillStyle = '#00d4ff';
   [60, 80, 100, 120, 140].forEach(v => {
@@ -1438,11 +1530,21 @@ function drawTrendChart() {
   });
 }
 
-function renderTrendTable() {
+/**
+ * 渲染趋势数据表格，根据 start/end（YYYY-MM-DDTHH:mm）过滤
+ */
+function renderTrendTable(start, end) {
+  if (!start) start = '2026-06-01T00:00';
+  if (!end)   end   = '2026-06-07T23:59';
+  // 数据只按小时记录（HH:00），将开始/结束时间向下取整到整点进行比较
+  // endKey 末位改为 :59 以确保包含当前小时内的所有整点记录
+  const startKey = start.replace('T', ' ').slice(0, 13) + ':00'; // YYYY-MM-DD HH:00
+  const endKey   = end.replace('T', ' ').slice(0, 13)   + ':59'; // YYYY-MM-DD HH:59（包含当前整点）
+  const filtered = TREND_DATA.filter(d => d.dateHour >= startKey && d.dateHour <= endKey);
   const tbody = document.getElementById('trend-tbody');
-  tbody.innerHTML = TREND_DATA.map(d => `
+  tbody.innerHTML = filtered.map(d => `
     <tr class="${d.isAbnormal ? 'abnormal' : ''}">
-      <td>${d.hour}</td>
+      <td style="font-family:monospace;white-space:nowrap">${d.dateHour}</td>
       <td>${d.hr}</td>
       <td>${d.spo2}%</td>
       <td>${d.sbp}/${d.dbp}</td>
@@ -1452,28 +1554,60 @@ function renderTrendTable() {
   `).join('');
 }
 
-// 10条事件数据
+// 30条事件数据，时间分布在 2026-06-01 至 2026-07-12
 const EVENTS_DATA = [
-  { time: '03:22', type: 'alarm', desc: 'SpO₂ 危急下降至 86%，自动触发报警' },
-  { time: '03:35', type: 'op', desc: '护士调整呼吸机参数，FiO₂ 提升至 60%' },
-  { time: '03:55', type: 'alarm', desc: 'HR 超过 140 bpm，持续 5 分钟' },
-  { time: '04:10', type: 'order', desc: '医嘱：去甲肾上腺素 0.2μg/kg/min 静脉泵入' },
-  { time: '04:30', type: 'op', desc: '医生到场查看患者，调整镇痛镇静方案' },
-  { time: '07:00', type: 'order', desc: '医嘱：抽血复查血气分析' },
-  { time: '08:30', type: 'op', desc: '护士翻身拍背，体位引流' },
-  { time: '11:15', type: 'alarm', desc: '体温 38.9°C，发热报警' },
-  { time: '13:00', type: 'order', desc: '医嘱：物理降温，冰毯降温' },
-  { time: '17:45', type: 'alarm', desc: '血压下降 78/45 mmHg，危急报警' },
+  { date: '2026-06-01', time: '02:15', type: 'alarm', desc: 'SpO₂ 危急下降至 84%，自动触发报警' },
+  { date: '2026-06-01', time: '08:30', type: 'op',    desc: '护士更换床单，协助患者翻身' },
+  { date: '2026-06-02', time: '03:40', type: 'alarm', desc: 'HR 超过 145 bpm，持续 8 分钟' },
+  { date: '2026-06-02', time: '04:05', type: 'order', desc: '医嘱：去甲肾上腺素 0.2μg/kg/min 静脉泵入' },
+  { date: '2026-06-03', time: '10:22', type: 'op',    desc: '护士翻身拍背，体位引流' },
+  { date: '2026-06-04', time: '01:50', type: 'alarm', desc: '血压危急下降 72/42 mmHg' },
+  { date: '2026-06-04', time: '14:00', type: 'order', desc: '医嘱：抽血复查血气分析' },
+  { date: '2026-06-05', time: '09:10', type: 'op',    desc: '更换中心静脉导管敷料' },
+  { date: '2026-06-06', time: '22:30', type: 'alarm', desc: '体温 39.2°C，发热报警' },
+  { date: '2026-06-07', time: '06:00', type: 'order', desc: '医嘱：物理降温，冰毯降温' },
+  { date: '2026-06-08', time: '15:45', type: 'alarm', desc: 'RR > 32 次/分，呼吸急促报警' },
+  { date: '2026-06-09', time: '11:20', type: 'op',    desc: '吸痰操作，清除气道分泌物' },
+  { date: '2026-06-10', time: '04:35', type: 'alarm', desc: 'SpO₂ < 88%，低氧血症报警' },
+  { date: '2026-06-10', time: '05:00', type: 'order', desc: '医嘱：调整呼吸机 FiO₂ 至 65%' },
+  { date: '2026-06-12', time: '13:15', type: 'op',    desc: '更换尿管，记录24小时尿量' },
+  { date: '2026-06-13', time: '02:05', type: 'alarm', desc: 'HR 超过 150 bpm，心动过速报警' },
+  { date: '2026-06-14', time: '18:40', type: 'order', desc: '医嘱：追加丙泊酚镇静剂量' },
+  { date: '2026-06-15', time: '07:30', type: 'op',    desc: '晨间护理，口腔护理完成' },
+  { date: '2026-06-17', time: '03:22', type: 'alarm', desc: 'SpO₂ 危急下降至 86%，自动触发报警' },
+  { date: '2026-06-17', time: '04:10', type: 'order', desc: '医嘱：去甲肾上腺素加量 0.3μg/kg/min' },
+  { date: '2026-06-19', time: '16:55', type: 'alarm', desc: '体温 39.8°C，高热危急报警' },
+  { date: '2026-06-21', time: '09:00', type: 'op',    desc: '气管切开换药，切口清洁' },
+  { date: '2026-06-23', time: '00:45', type: 'alarm', desc: '血压骤降 68/40 mmHg，危急报警' },
+  { date: '2026-06-25', time: '11:30', type: 'order', desc: '医嘱：调整血管活性药物剂量' },
+  { date: '2026-06-27', time: '14:20', type: 'op',    desc: '康复锻炼：协助患者被动运动' },
+  { date: '2026-06-29', time: '03:10', type: 'alarm', desc: 'SpO₂ 下降至 85%，持续 10 分钟' },
+  { date: '2026-07-01', time: '08:00', type: 'order', desc: '医嘱：复查胸部 CT，评估肺部状态' },
+  { date: '2026-07-04', time: '22:15', type: 'alarm', desc: 'HR 超过 148 bpm，心动过速报警' },
+  { date: '2026-07-08', time: '10:45', type: 'op',    desc: '拔除气管插管，改无创通气' },
+  { date: '2026-07-12', time: '15:30', type: 'order', desc: '医嘱：患者病情稳定，降级护理级别' },
 ];
 
 let currentFilter = 'all';
 
-function renderEvents(filter) {
+/**
+ * 渲染事件列表，支持按类型过滤和按日期范围过滤
+ */
+function renderEvents(filter, start, end) {
   const list = document.getElementById('event-list');
-  const filtered = filter === 'all' ? EVENTS_DATA : EVENTS_DATA.filter(e => e.type === filter);
+  let filtered = filter === 'all' ? EVENTS_DATA : EVENTS_DATA.filter(e => e.type === filter);
+  // 按日期范围过滤
+  if (start) {
+    const startDay = start.slice(0, 10);
+    filtered = filtered.filter(e => e.date >= startDay);
+  }
+  if (end) {
+    const endDay = end.slice(0, 10);
+    filtered = filtered.filter(e => e.date <= endDay);
+  }
   list.innerHTML = filtered.map(e => `
     <div class="event-item">
-      <span class="ev-time">${e.time}</span>
+      <span class="ev-time">${e.date} ${e.time}</span>
       <span class="ev-type ${e.type}-type">${e.type === 'alarm' ? '报警' : e.type === 'op' ? '操作' : '医嘱'}</span>
       <span class="ev-desc">${e.desc}</span>
     </div>
@@ -1484,7 +1618,21 @@ function filterEvents(type, btn) {
   currentFilter = type;
   document.querySelectorAll('.event-filter .filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  renderEvents(type);
+  // 保持当前时间范围过滤
+  const start = document.getElementById('time-start').value;
+  const end   = document.getElementById('time-end').value;
+  renderEvents(type, start, end);
+}
+
+/**
+ * 查询按钮点击：根据选择的日期范围重新渲染趋势图、表格和事件列表
+ */
+function onQueryClick() {
+  const start = document.getElementById('time-start').value; // YYYY-MM-DDTHH:mm
+  const end   = document.getElementById('time-end').value;
+  drawTrendChart(start, end);
+  renderTrendTable(start, end);
+  renderEvents(currentFilter, start, end);
 }
 
 /* ===== 模块4：报警事件 ===== */
@@ -1566,8 +1714,9 @@ function updateClock() {
 function init() {
   renderBedGrid();
   renderAlarmHistory();
-  renderTrendTable();
-  renderEvents('all');
+  // 数据回顾模块默认展示前7天数据
+  renderTrendTable('2026-06-01T00:00', '2026-06-07T23:59');
+  renderEvents('all', '2026-06-01T00:00', '2026-07-12T23:59');
   renderAlarmTable();
   updateClock();
 
@@ -1583,7 +1732,10 @@ window.addEventListener('load', init);
 window.addEventListener('resize', () => {
   const module = document.getElementById('module-review');
   if (module && module.classList.contains('active')) {
-    drawTrendChart();
+    // 调整大小时使用当前时间选择器的值重绘
+    const start = document.getElementById('time-start').value || '2026-06-01T00:00';
+    const end   = document.getElementById('time-end').value   || '2026-07-12T23:59';
+    drawTrendChart(start, end);
   }
   const ecgModule = document.getElementById('module-patient');
   if (ecgModule && ecgModule.classList.contains('active')) {
