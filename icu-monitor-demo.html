@@ -608,9 +608,9 @@ canvas#trendCanvas {
 
 .sync-val { color: var(--text); font-family: monospace; }
 
-.data-table tr.selected-row td {
-  background: rgba(0,212,255,0.12) !important;
-  color: var(--primary) !important;
+#trend-tbody tr.selected-row td {
+  background: rgba(0,212,255,0.12);
+  color: var(--primary);
 }
 
 /* 趋势数据表格 */
@@ -2028,19 +2028,22 @@ function onTrendCanvasClick(e) {
   const canvas = document.getElementById('trendCanvas');
   if (!canvas || !trendChartDataRef.length) return;
   const rect = canvas.getBoundingClientRect();
+  if (!rect.width) return; // canvas not yet rendered or hidden
   // CSS width may differ from canvas pixel width; scale accordingly
   const scaleX = canvas.width / rect.width;
   const clickX = (e.clientX - rect.left) * scaleX;
   const { padL, xStep, xOffset } = trendChartLayout;
 
   // Find nearest data point index
+  // CLICK_TOLERANCE_FACTOR: clicks beyond 60% of step distance from any point are ignored
+  const CLICK_TOLERANCE_FACTOR = 0.6;
   let nearestIdx = 0, minDist = Infinity;
   trendChartDataRef.forEach((d, i) => {
     const x = padL + xOffset + xStep * i;
     const dist = Math.abs(clickX - x);
     if (dist < minDist) { minDist = dist; nearestIdx = i; }
   });
-  if (minDist > xStep * 0.6) return; // too far from any point
+  if (minDist > xStep * CLICK_TOLERANCE_FACTOR) return;
 
   const d = trendChartDataRef[nearestIdx];
   if (!d) return;
