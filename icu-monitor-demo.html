@@ -2425,11 +2425,14 @@ const MAX_ALARM_TOASTS = 5;
 function showAlarm(alarm) {
   const toaster = document.getElementById('alarm-toaster');
   const existing = toaster.querySelectorAll('.alarm-toast');
-  if (existing.length >= MAX_ALARM_TOASTS) {
-    dismissToast(existing[0]);
+  if (existing.length >= MAX_ALARM_TOASTS) return;
+  const alarmKey = (alarm.bed || '') + '|' + (alarm.type || alarm.desc || '');
+  for (const t of existing) {
+    if (t.dataset.alarmKey === alarmKey) return;
   }
   const toast = document.createElement('div');
   toast.className = 'alarm-toast';
+  toast.dataset.alarmKey = alarmKey;
   let bodyText = alarm.desc || alarm.message || '';
   if (!bodyText && alarm.type) {
     bodyText = alarm.type + '：' + (alarm.value || '') + (alarm.threshold ? '（阈值 ' + alarm.threshold + '）' : '');
