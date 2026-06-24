@@ -1226,8 +1226,8 @@ function renderBedGrid() {
       <div class="bed-card-header">
         <div>
           <div class="bed-no">${esc(p.bed)}</div>
-          <div class="bed-patient">${p.name}</div>
-          <div class="bed-patient-sub">${p.age}岁 · ${p.gender} · ${p.diag}</div>
+          <div class="bed-patient">${esc(p.name)}</div>
+          <div class="bed-patient-sub">${esc(p.age)}岁 · ${esc(p.gender)} · ${esc(p.diag)}</div>
         </div>
         <span class="status-badge ${p.status === 'ok' ? 'ok' : p.status === 'warn' ? 'warn' : 'danger'}" id="badge-${i}">
           ${p.status === 'ok' ? '正常' : p.status === 'warn' ? '警告' : '危急'}
@@ -1943,7 +1943,7 @@ let ventWaveAnim = null;
 const HR_HIGH_THRESHOLD = 120;
 const HR_LOW_THRESHOLD = 50;
 const SPO2_LOW_THRESHOLD = 90;
-const ALARM_COOLDOWN_MS = 30000;
+const ALARM_COOLDOWN_MS = 30000; // 防止同一参数短时间内重复弹窗轰炸
 const PPEAK_SPIKE_PROBABILITY = 0.03;
 const PPEAK_CRITICAL_BASE = 36;
 const PPEAK_SPIKE_RANGE = 5;
@@ -2037,7 +2037,7 @@ function renderBedGrid() {
     card.innerHTML = `
       <div class="bed-card-header">
         <div>
-          <div class="bed-no">${p.bed}</div>
+          <div class="bed-no">${esc(p.bed)}</div>
           <div class="bed-patient">${esc(p.name)}</div>
           <div class="bed-patient-sub">${esc(p.age)}岁 · ${esc(p.gender)} · ${esc(p.diag)}</div>
         </div>
@@ -2470,7 +2470,15 @@ function initEnhancements() {
   const waveBtn = document.getElementById('wave-play-btn');
   if (waveBtn) waveBtn.textContent = WAVE_PLAY_TEXT.playing;
   const select = document.getElementById('report-patient');
-  if (select) select.innerHTML = PATIENTS.map((p, i) => `<option value="${i}">${p.bed} ${p.name}</option>`).join('');
+  if (select) {
+    select.innerHTML = '';
+    PATIENTS.forEach((p, i) => {
+      const option = document.createElement('option');
+      option.value = String(i);
+      option.textContent = `${p.bed} ${p.name}`;
+      select.appendChild(option);
+    });
+  }
   renderBedGrid();
   renderVentCentralGrid();
   renderVentPatientPanel();
