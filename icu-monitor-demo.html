@@ -3060,6 +3060,10 @@ function exportNursingLog() {
 /* ===== 患者日志 子Tab 切换 ===== */
 let nlogCurrentTab = 'general';
 
+/* ===== 共享工具函数 ===== */
+function clampStr(d, lo, hi) { return d < lo ? lo : d > hi ? hi : d; }
+function daysBetween(a, b) { return Math.round((new Date(b) - new Date(a)) / 86400000); }
+
 function switchNlogTab(name, btn) {
   nlogCurrentTab = name;
   document.querySelectorAll('.nlog-sub-tab').forEach(b => b.classList.remove('active'));
@@ -3130,13 +3134,10 @@ function renderAbxLogs() {
   const endDate   = document.getElementById('nlog-end').value   || '2026-07-12';
   const orders = ABX_ORDERS.filter(o => o.startDate <= endDate && o.endDate >= startDate);
 
-  const clamp = (d, lo, hi) => d < lo ? lo : d > hi ? hi : d;
-  const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
-
   const drugs = [...new Set(orders.map(o => o.drug))];
   const totalDays = orders.reduce((s, o) => {
-    const s2 = clamp(o.startDate, startDate, endDate);
-    const e2 = clamp(o.endDate,   startDate, endDate);
+    const s2 = clampStr(o.startDate, startDate, endDate);
+    const e2 = clampStr(o.endDate,   startDate, endDate);
     return s + Math.max(0, daysBetween(s2, e2) + 1);
   }, 0);
 
@@ -3166,7 +3167,7 @@ function renderAbxLogs() {
 
   const sd = new Date(startDate), ed = new Date(endDate);
   const totalSpan = Math.max(1, daysBetween(startDate, endDate) + 1);
-  canvas.width = Math.max(700, canvas.parentElement.clientWidth - 24);
+  canvas.width = Math.max(700, canvas.parentElement.clientWidth - 24); /* 24 = 2 × 12px container padding */
   const chartW = canvas.width - paddingLeft - paddingRight;
 
   const ctx = canvas.getContext('2d');
@@ -3191,13 +3192,13 @@ function renderAbxLogs() {
 
     /* row label */
     ctx.fillStyle = '#c8d8e8';
-    ctx.font = '12px "Microsoft YaHei", sans-serif';
+    ctx.font = '12px "Segoe UI", "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText(o.drug, paddingLeft - 8, barY + barH / 2 + 4);
 
     /* bar */
-    const s2 = clamp(o.startDate, startDate, endDate);
-    const e2 = clamp(o.endDate,   startDate, endDate);
+    const s2 = clampStr(o.startDate, startDate, endDate);
+    const e2 = clampStr(o.endDate,   startDate, endDate);
     const sx = paddingLeft + (daysBetween(startDate, s2) / totalSpan) * chartW;
     const ex = paddingLeft + ((daysBetween(startDate, e2) + 1) / totalSpan) * chartW;
     ctx.fillStyle = o.color + 'cc';
