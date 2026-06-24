@@ -2337,7 +2337,8 @@ function togglePatientSection(section, visible) {
     if (section === 'monitor') {
       const layout = el.closest('.detail-layout');
       if (layout) layout.style.gridTemplateColumns = visible ? '' : '1fr';
-      // Recalculate ECG canvas widths after layout change
+      // requestAnimationFrame ensures the browser completes grid layout recalculation
+      // (after changing grid-template-columns) before we read clientWidth, preventing stale values.
       requestAnimationFrame(() => {
         ECG_LEADS.forEach(lead => {
           const canvas = document.getElementById('ecgCanvas_' + lead.id);
