@@ -981,6 +981,82 @@ canvas#trendCanvas {
 .nlog-tag.alarm-tag    { background: var(--warn-dim);    color: var(--warn); }
 .nlog-tag.op-tag       { background: var(--ok-dim);      color: var(--ok); }
 .nlog-tag.critical-tag { background: var(--danger-dim);  color: var(--danger); }
+.nlog-tag.vte-tag      { background: rgba(160,100,255,0.18); color: #c084fc; }
+.nlog-tag.abx-tag      { background: rgba(255,200,0,0.15);   color: #fbbf24; }
+.nlog-tag.en-tag       { background: rgba(0,255,136,0.12);   color: var(--ok); }
+
+/* ===== 患者日志 子Tab ===== */
+.nlog-sub-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+.nlog-sub-tab {
+  padding: 6px 18px;
+  border-radius: 6px 6px 0 0;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-family: var(--font);
+  transition: all 0.2s;
+}
+.nlog-sub-tab:hover { color: var(--text); background: var(--primary-dim); }
+.nlog-sub-tab.active { color: var(--primary); border-bottom: 2px solid var(--primary); background: var(--primary-dim); }
+
+/* ===== VTE 日志 ===== */
+.vte-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.vte-stat-card {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+}
+.vte-stat-num  { font-size: 30px; font-weight: 700; color: #c084fc; line-height: 1.1; }
+.vte-stat-label { font-size: 12px; color: var(--text); margin-top: 4px; }
+.vte-treatment-table th { background: rgba(160,100,255,0.1); }
+
+/* ===== 抗生素 甘特图 ===== */
+.abx-gantt-wrap {
+  overflow-x: auto;
+  margin-top: 8px;
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+#abxGanttCanvas { display: block; }
+.abx-legend { display: flex; gap: 16px; margin-top: 10px; flex-wrap: wrap; }
+.abx-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); }
+.abx-legend-dot  { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+
+/* ===== 肠内营养日志 ===== */
+.en-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.en-stat-card {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+}
+.en-stat-num   { font-size: 28px; font-weight: 700; color: var(--ok); line-height: 1.1; }
+.en-stat-unit  { font-size: 12px; color: var(--text-dim); margin-left: 2px; }
+.en-stat-label { font-size: 12px; color: var(--text); margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -1996,6 +2072,37 @@ const EVENTS_DATA = [
   { date: '2026-07-12', time: '15:30', type: 'order', desc: '医嘱：患者病情稳定，降级护理级别' },
 ];
 
+/* ===== VTE 医嘱数据 ===== */
+const VTE_ORDERS = [
+  { date: '2026-06-15', time: '10:00', drug: '依诺肝素钠注射液', category: '预防', dose: '40 mg', route: '皮下注射', freq: 'qd', startDate: '2026-06-15', endDate: '2026-06-21', days: 6, riskScore: 5, scoreLevel: '高危', method: '药物预防' },
+  { date: '2026-06-16', time: '08:00', drug: '间歇充气加压泵', category: '预防', dose: '—', route: '物理治疗', freq: 'bid', startDate: '2026-06-16', endDate: '2026-06-20', days: 4, riskScore: 5, scoreLevel: '高危', method: '物理预防' },
+  { date: '2026-06-22', time: '09:30', drug: '低分子肝素钙', category: '治疗', dose: '100 IU/kg', route: '皮下注射', freq: 'q12h', startDate: '2026-06-22', endDate: '2026-07-01', days: 9, riskScore: 7, scoreLevel: '极高危', method: '治疗性抗凝' },
+  { date: '2026-07-02', time: '10:00', drug: '利伐沙班片', category: '治疗', dose: '15 mg', route: '口服', freq: 'bid', startDate: '2026-07-02', endDate: '2026-07-12', days: 10, riskScore: 7, scoreLevel: '极高危', method: '口服抗凝序贯治疗' },
+];
+
+/* ===== 抗生素医嘱数据 ===== */
+const ABX_ORDERS = [
+  { drug: '头孢哌酮钠舒巴坦钠', indication: '重症肺炎', dose: '3g', route: '静脉滴注', freq: 'q8h', startDate: '2026-06-15', endDate: '2026-06-21', color: '#38bdf8' },
+  { drug: '万古霉素',             indication: 'MRSA 感染', dose: '1g',  route: '静脉滴注', freq: 'q12h', startDate: '2026-06-17', endDate: '2026-06-27', color: '#f87171' },
+  { drug: '卡泊芬净',             indication: '侵袭性真菌感染', dose: '50 mg', route: '静脉滴注', freq: 'qd', startDate: '2026-06-20', endDate: '2026-07-01', color: '#a78bfa' },
+  { drug: '美罗培南',             indication: '腹腔感染升级', dose: '1g',  route: '静脉滴注', freq: 'q8h', startDate: '2026-06-26', endDate: '2026-07-06', color: '#34d399' },
+  { drug: '替加环素',             indication: '泛耐药菌联合', dose: '50 mg', route: '静脉滴注', freq: 'q12h', startDate: '2026-07-04', endDate: '2026-07-12', color: '#fbbf24' },
+];
+
+/* ===== 肠内营养医嘱数据 ===== */
+const EN_ORDERS = [
+  { date: '2026-06-16', time: '08:00', product: '瑞素（整蛋白型）',   type: '整蛋白型', volume: 500,  calories: 500,  protein: 20,  rate: '50 mL/h',  duration: 10, route: '鼻胃管' },
+  { date: '2026-06-17', time: '08:00', product: '瑞素（整蛋白型）',   type: '整蛋白型', volume: 750,  calories: 750,  protein: 30,  rate: '62 mL/h',  duration: 12, route: '鼻胃管' },
+  { date: '2026-06-18', time: '08:00', product: '瑞素（整蛋白型）',   type: '整蛋白型', volume: 1000, calories: 1000, protein: 40,  rate: '83 mL/h',  duration: 12, route: '鼻胃管' },
+  { date: '2026-06-20', time: '07:00', product: '能全力（高能量型）',  type: '高能量型', volume: 1000, calories: 1500, protein: 56,  rate: '83 mL/h',  duration: 12, route: '鼻空肠管' },
+  { date: '2026-06-22', time: '07:00', product: '能全力（高能量型）',  type: '高能量型', volume: 1250, calories: 1875, protein: 70,  rate: '104 mL/h', duration: 12, route: '鼻空肠管' },
+  { date: '2026-06-25', time: '07:00', product: '瑞代（糖尿病专用）', type: '疾病专用型', volume: 500, calories: 450,  protein: 18,  rate: '42 mL/h',  duration: 12, route: '鼻空肠管' },
+  { date: '2026-06-27', time: '07:00', product: '瑞代（糖尿病专用）', type: '疾病专用型', volume: 750, calories: 675,  protein: 27,  rate: '62 mL/h',  duration: 12, route: '鼻空肠管' },
+  { date: '2026-06-29', time: '07:00', product: '安素（整蛋白粉）',   type: '整蛋白型', volume: 300,  calories: 450,  protein: 19,  rate: '—',        duration: 0,  route: '口服' },
+  { date: '2026-07-02', time: '07:00', product: '安素（整蛋白粉）',   type: '整蛋白型', volume: 450,  calories: 675,  protein: 28,  rate: '—',        duration: 0,  route: '口服' },
+  { date: '2026-07-05', time: '07:00', product: '瑞先（高蛋白型）',   type: '高蛋白型', volume: 500,  calories: 750,  protein: 38,  rate: '42 mL/h',  duration: 12, route: '口服/管饲' },
+];
+
 let currentFilter = 'all';
 
 /**
@@ -2949,6 +3056,230 @@ function exportNlogSource() {
 function exportNursingLog() {
   simulateDownload('患者日志导出中，文件即将下载...');
 }
+
+/* ===== 患者日志 子Tab 切换 ===== */
+let nlogCurrentTab = 'general';
+
+function switchNlogTab(name, btn) {
+  nlogCurrentTab = name;
+  document.querySelectorAll('.nlog-sub-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  ['general', 'vte', 'abx', 'en'].forEach(t => {
+    document.getElementById('nlog-panel-' + t).style.display = t === name ? '' : 'none';
+  });
+  if (name === 'vte')  renderVteLogs();
+  if (name === 'abx')  renderAbxLogs();
+  if (name === 'en')   renderEnLogs();
+}
+
+/* ===== VTE 日志渲染 ===== */
+function renderVteLogs() {
+  const startDate = document.getElementById('nlog-start').value || '2026-06-01';
+  const endDate   = document.getElementById('nlog-end').value   || '2026-07-12';
+  const orders = VTE_ORDERS.filter(o => o.startDate <= endDate && o.endDate >= startDate);
+
+  const prevent = orders.filter(o => o.category === '预防');
+  const treat   = orders.filter(o => o.category === '治疗');
+  const maxScore = orders.reduce((m, o) => Math.max(m, o.riskScore), 0);
+  const totalDays = orders.reduce((s, o) => s + o.days, 0);
+
+  document.getElementById('vte-summary-grid').innerHTML = [
+    { num: orders.length, label: '医嘱总数', unit: '条' },
+    { num: prevent.length, label: '预防性医嘱', unit: '条' },
+    { num: treat.length,   label: '治疗性医嘱', unit: '条' },
+    { num: maxScore,       label: '最高 VTE 评分', unit: '分' },
+  ].map(d => `
+    <div class="vte-stat-card">
+      <div class="vte-stat-num">${d.num}</div>
+      <div class="vte-stat-label">${d.label}（${d.unit}）</div>
+    </div>`).join('');
+
+  document.getElementById('vte-orders-tbody').innerHTML = orders.map(o => `
+    <tr>
+      <td style="white-space:nowrap">${o.startDate}</td>
+      <td>${esc(o.drug)}</td>
+      <td><span class="nlog-tag vte-tag">${esc(o.category)}</span></td>
+      <td>${esc(o.dose)}</td>
+      <td>${esc(o.route)}</td>
+      <td>${esc(o.freq)}</td>
+      <td>${o.days}</td>
+      <td>${o.riskScore} <span style="font-size:11px;color:var(--text-dim)">(${esc(o.scoreLevel)})</span></td>
+      <td>${esc(o.method)}</td>
+    </tr>`).join('');
+
+  document.getElementById('vte-timeline-body').innerHTML = orders.map(o => `
+    <div class="nlog-entry">
+      <div class="nlog-entry-dot order"></div>
+      <div class="nlog-entry-content">
+        <div class="nlog-entry-header">
+          <span class="nlog-tag vte-tag">${esc(o.category)}</span>
+          <span class="nlog-entry-time">${o.startDate} → ${o.endDate}</span>
+        </div>
+        <div class="nlog-entry-desc">
+          <strong>${esc(o.drug)}</strong> &nbsp;${esc(o.dose)} ${esc(o.freq)} ${esc(o.route)}
+          &nbsp;·&nbsp; VTE评分 <strong style="color:#c084fc">${o.riskScore}</strong>（${esc(o.scoreLevel)}）
+          &nbsp;·&nbsp; 治疗方式：${esc(o.method)}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+/* ===== 抗生素日志渲染 ===== */
+function renderAbxLogs() {
+  const startDate = document.getElementById('nlog-start').value || '2026-06-01';
+  const endDate   = document.getElementById('nlog-end').value   || '2026-07-12';
+  const orders = ABX_ORDERS.filter(o => o.startDate <= endDate && o.endDate >= startDate);
+
+  const clamp = (d, lo, hi) => d < lo ? lo : d > hi ? hi : d;
+  const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
+
+  const drugs = [...new Set(orders.map(o => o.drug))];
+  const totalDays = orders.reduce((s, o) => {
+    const s2 = clamp(o.startDate, startDate, endDate);
+    const e2 = clamp(o.endDate,   startDate, endDate);
+    return s + Math.max(0, daysBetween(s2, e2) + 1);
+  }, 0);
+
+  document.getElementById('abx-summary-grid').innerHTML = [
+    { num: orders.length, label: '医嘱条数' },
+    { num: drugs.length,  label: '抗生素种类' },
+    { num: totalDays,     label: '合计用药天数' },
+    { num: Math.max(...orders.map(o => daysBetween(o.startDate, o.endDate) + 1), 0), label: '最长单药疗程(天)' },
+  ].map(d => `
+    <div class="vte-stat-card" style="border-color:rgba(251,191,36,0.3);">
+      <div class="vte-stat-num" style="color:#fbbf24">${d.num}</div>
+      <div class="vte-stat-label">${d.label}</div>
+    </div>`).join('');
+
+  /* --- legend --- */
+  document.getElementById('abx-legend').innerHTML = orders.map(o => `
+    <div class="abx-legend-item">
+      <div class="abx-legend-dot" style="background:${o.color}"></div>
+      <span>${esc(o.drug)}</span>
+    </div>`).join('');
+
+  /* --- Gantt canvas --- */
+  const canvas = document.getElementById('abxGanttCanvas');
+  const rowH = 34, paddingLeft = 160, paddingRight = 20, topPad = 30, bottomPad = 10;
+  const totalRows = orders.length;
+  canvas.height = topPad + totalRows * rowH + bottomPad;
+
+  const sd = new Date(startDate), ed = new Date(endDate);
+  const totalSpan = Math.max(1, daysBetween(startDate, endDate) + 1);
+  canvas.width = Math.max(700, canvas.parentElement.clientWidth - 24);
+  const chartW = canvas.width - paddingLeft - paddingRight;
+
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  /* grid */
+  ctx.strokeStyle = 'rgba(30,45,74,0.8)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= totalSpan; i += Math.ceil(totalSpan / 10)) {
+    const x = paddingLeft + (i / totalSpan) * chartW;
+    ctx.beginPath(); ctx.moveTo(x, topPad); ctx.lineTo(x, canvas.height - bottomPad); ctx.stroke();
+    const d = new Date(sd); d.setDate(d.getDate() + i);
+    ctx.fillStyle = 'rgba(90,120,154,0.8)';
+    ctx.font = '11px monospace';
+    ctx.fillText(d.toISOString().slice(5, 10), x - 14, topPad - 6);
+  }
+
+  orders.forEach((o, i) => {
+    const y = topPad + i * rowH;
+    const barY = y + 6;
+    const barH = rowH - 12;
+
+    /* row label */
+    ctx.fillStyle = '#c8d8e8';
+    ctx.font = '12px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(o.drug, paddingLeft - 8, barY + barH / 2 + 4);
+
+    /* bar */
+    const s2 = clamp(o.startDate, startDate, endDate);
+    const e2 = clamp(o.endDate,   startDate, endDate);
+    const sx = paddingLeft + (daysBetween(startDate, s2) / totalSpan) * chartW;
+    const ex = paddingLeft + ((daysBetween(startDate, e2) + 1) / totalSpan) * chartW;
+    ctx.fillStyle = o.color + 'cc';
+    ctx.beginPath();
+    const bx = sx, by = barY, bw2 = Math.max(4, ex - sx), bh2 = barH, r2 = 4;
+    ctx.moveTo(bx + r2, by);
+    ctx.lineTo(bx + bw2 - r2, by); ctx.arcTo(bx + bw2, by, bx + bw2, by + r2, r2);
+    ctx.lineTo(bx + bw2, by + bh2 - r2); ctx.arcTo(bx + bw2, by + bh2, bx + bw2 - r2, by + bh2, r2);
+    ctx.lineTo(bx + r2, by + bh2); ctx.arcTo(bx, by + bh2, bx, by + bh2 - r2, r2);
+    ctx.lineTo(bx, by + r2); ctx.arcTo(bx, by, bx + r2, by, r2);
+    ctx.closePath();
+    ctx.fill();
+
+    /* days label inside bar */
+    const bw = ex - sx;
+    const dlen = daysBetween(o.startDate, o.endDate) + 1;
+    if (bw > 30) {
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 11px "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(dlen + '天', sx + bw / 2, barY + barH / 2 + 4);
+    }
+  });
+  ctx.textAlign = 'left';
+
+  /* --- Timeline --- */
+  document.getElementById('abx-timeline-body').innerHTML = orders.map(o => `
+    <div class="nlog-entry">
+      <div class="nlog-entry-dot order" style="background:${o.color}"></div>
+      <div class="nlog-entry-content">
+        <div class="nlog-entry-header">
+          <span class="nlog-tag abx-tag">抗生素</span>
+          <span class="nlog-entry-time">${o.startDate} → ${o.endDate}</span>
+        </div>
+        <div class="nlog-entry-desc">
+          <strong>${esc(o.drug)}</strong> &nbsp;${esc(o.dose)} ${esc(o.freq)} ${esc(o.route)}
+          &nbsp;·&nbsp; 适应证：${esc(o.indication)}
+          &nbsp;·&nbsp; 疗程 <strong style="color:${o.color}">${daysBetween(o.startDate, o.endDate) + 1}</strong> 天
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+/* ===== 肠内营养日志渲染 ===== */
+function renderEnLogs() {
+  const startDate = document.getElementById('nlog-start').value || '2026-06-01';
+  const endDate   = document.getElementById('nlog-end').value   || '2026-07-12';
+  const orders = EN_ORDERS.filter(o => o.date >= startDate && o.date <= endDate);
+
+  const totalVol = orders.reduce((s, o) => s + o.volume, 0);
+  const totalCal = orders.reduce((s, o) => s + o.calories, 0);
+  const totalPro = orders.reduce((s, o) => s + o.protein, 0);
+  const types = [...new Set(orders.map(o => o.type))];
+
+  document.getElementById('en-summary-grid').innerHTML = [
+    { num: orders.length,      label: '医嘱条数',       unit: '条',   color: 'var(--ok)' },
+    { num: totalVol,           label: '合计输注量',      unit: 'mL',   color: 'var(--ok)' },
+    { num: totalCal,           label: '合计热量',        unit: 'kcal', color: '#fbbf24' },
+    { num: totalPro,           label: '合计蛋白质摄入',  unit: 'g',    color: '#38bdf8' },
+  ].map(d => `
+    <div class="en-stat-card">
+      <div class="en-stat-num" style="color:${d.color}">${d.num}<span class="en-stat-unit">${d.unit}</span></div>
+      <div class="en-stat-label">${d.label}</div>
+    </div>`).join('');
+
+  const typeColors = { '整蛋白型': '#34d399', '高能量型': '#fbbf24', '高蛋白型': '#38bdf8', '疾病专用型': '#a78bfa' };
+  document.getElementById('en-orders-tbody').innerHTML = orders.map(o => {
+    const col = typeColors[o.type] || 'var(--ok)';
+    return `<tr>
+      <td style="white-space:nowrap">${o.date}</td>
+      <td style="white-space:nowrap;font-family:monospace">${o.time}</td>
+      <td>${esc(o.product)}</td>
+      <td><span class="nlog-tag en-tag" style="background:${col}22;color:${col}">${esc(o.type)}</span></td>
+      <td>${esc(o.route)}</td>
+      <td style="text-align:right">${o.volume}</td>
+      <td style="text-align:right;color:#fbbf24;font-weight:600">${o.calories}</td>
+      <td style="text-align:right;color:#38bdf8">${o.protein}</td>
+      <td>${esc(o.rate)}</td>
+      <td style="text-align:right">${o.duration || '—'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--text-dim)">当前时间范围内无肠内营养记录</td></tr>';
+}
 </script>
 <!-- ===== 模块：患者日志 ===== -->
 <div id="module-nursing-log" class="module">
@@ -2968,19 +3299,101 @@ function exportNursingLog() {
     </div>
   </div>
 
-  <!-- 统计卡片（点击可溯源） -->
-  <div class="nursing-log-stats" id="nlog-stats" style="display:none;"></div>
-
-  <!-- 智能分析 -->
-  <div class="card" id="nlog-analysis-card" style="display:none;margin-bottom:16px;">
-    <div class="panel-title">🤖 智能分析</div>
-    <div id="nlog-analysis-body" style="padding-top:8px;"></div>
+  <!-- 子 Tab 切换 -->
+  <div class="nlog-sub-tabs">
+    <button class="nlog-sub-tab active" onclick="switchNlogTab('general', this)">综合日志</button>
+    <button class="nlog-sub-tab" onclick="switchNlogTab('vte', this)">🛡 VTE 日志</button>
+    <button class="nlog-sub-tab" onclick="switchNlogTab('abx', this)">💊 抗生素日志</button>
+    <button class="nlog-sub-tab" onclick="switchNlogTab('en', this)">🥗 肠内营养</button>
   </div>
 
-  <!-- 日志时间轴 -->
-  <div class="card" id="nlog-timeline-card" style="display:none;">
-    <div class="panel-title" style="margin-bottom:12px;">📜 护理日志时间轴</div>
-    <div class="nlog-timeline" id="nlog-timeline-body"></div>
+  <!-- ====== 子面板：综合日志 ====== -->
+  <div id="nlog-panel-general">
+    <!-- 统计卡片（点击可溯源） -->
+    <div class="nursing-log-stats" id="nlog-stats" style="display:none;"></div>
+
+    <!-- 智能分析 -->
+    <div class="card" id="nlog-analysis-card" style="display:none;margin-bottom:16px;">
+      <div class="panel-title">🤖 智能分析</div>
+      <div id="nlog-analysis-body" style="padding-top:8px;"></div>
+    </div>
+
+    <!-- 日志时间轴 -->
+    <div class="card" id="nlog-timeline-card" style="display:none;">
+      <div class="panel-title" style="margin-bottom:12px;">📜 护理日志时间轴</div>
+      <div class="nlog-timeline" id="nlog-timeline-body"></div>
+    </div>
+  </div>
+
+  <!-- ====== 子面板：VTE 日志 ====== -->
+  <div id="nlog-panel-vte" style="display:none;">
+    <div class="card" style="margin-bottom:16px;">
+      <div class="panel-title" style="margin-bottom:14px;">🛡 VTE 风险评估 &amp; 医嘱汇总</div>
+      <div class="vte-summary-grid" id="vte-summary-grid"></div>
+    </div>
+    <div class="card">
+      <div class="panel-title" style="margin-bottom:12px;">📋 VTE 医嘱明细</div>
+      <div style="overflow-x:auto;">
+        <table class="data-table vte-treatment-table" id="vte-orders-table" style="width:100%;">
+          <thead>
+            <tr>
+              <th>日期</th><th>药品 / 措施</th><th>类型</th><th>剂量</th>
+              <th>给药途径</th><th>频次</th><th>疗程(天)</th><th>VTE评分</th><th>治疗方式</th>
+            </tr>
+          </thead>
+          <tbody id="vte-orders-tbody"></tbody>
+        </table>
+      </div>
+      <!-- 时间轴 -->
+      <div style="margin-top:16px;">
+        <div style="font-size:12px;color:var(--text-dim);font-weight:600;margin-bottom:8px;">VTE 医嘱时间轴</div>
+        <div class="nlog-timeline" id="vte-timeline-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== 子面板：抗生素日志 ====== -->
+  <div id="nlog-panel-abx" style="display:none;">
+    <div class="card" style="margin-bottom:16px;">
+      <div class="panel-title" style="margin-bottom:14px;">💊 抗生素使用汇总</div>
+      <div class="vte-summary-grid" id="abx-summary-grid"></div>
+    </div>
+    <!-- 甘特图 -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="panel-title" style="margin-bottom:8px;">📊 抗生素用药甘特图</div>
+      <div class="abx-gantt-wrap">
+        <canvas id="abxGanttCanvas" height="200"></canvas>
+      </div>
+      <div class="abx-legend" id="abx-legend"></div>
+    </div>
+    <!-- 时间轴 -->
+    <div class="card">
+      <div class="panel-title" style="margin-bottom:12px;">🕐 抗生素医嘱时间轴</div>
+      <div class="nlog-timeline" id="abx-timeline-body"></div>
+    </div>
+  </div>
+
+  <!-- ====== 子面板：肠内营养 ====== -->
+  <div id="nlog-panel-en" style="display:none;">
+    <div class="card" style="margin-bottom:16px;">
+      <div class="panel-title" style="margin-bottom:14px;">🥗 肠内营养汇总</div>
+      <div class="en-summary-grid" id="en-summary-grid"></div>
+    </div>
+    <div class="card">
+      <div class="panel-title" style="margin-bottom:12px;">📋 肠内营养使用明细</div>
+      <div style="overflow-x:auto;">
+        <table class="data-table" id="en-orders-table" style="width:100%;">
+          <thead>
+            <tr>
+              <th>日期</th><th>时间</th><th>营养制剂</th><th>类型</th>
+              <th>给药途径</th><th>输注量(mL)</th><th>热量(kcal)</th><th>蛋白质(g)</th>
+              <th>输注速率</th><th>输注时长(h)</th>
+            </tr>
+          </thead>
+          <tbody id="en-orders-tbody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 
