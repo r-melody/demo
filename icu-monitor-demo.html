@@ -540,6 +540,7 @@ body {
   display: flex;
   gap: 20px;
   margin-bottom: 10px;
+  flex-wrap: wrap;
 }
 
 .legend-item {
@@ -561,6 +562,55 @@ canvas#trendCanvas {
   display: block;
   background: #050a14;
   border-radius: 6px;
+  cursor: crosshair;
+}
+
+.param-selector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.param-btn {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 4px 12px;
+  border-radius: 14px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--font);
+  transition: all 0.2s;
+}
+
+.param-btn.active {
+  border-color: currentColor;
+  opacity: 1;
+}
+
+.param-btn:not(.active) { opacity: 0.45; }
+
+.trend-sync-bar {
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: rgba(0,212,255,0.06);
+  border: 1px solid rgba(0,212,255,0.2);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+  display: none;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.trend-sync-bar.visible { display: flex; }
+
+.sync-val { color: var(--text); font-family: monospace; }
+
+.data-table tr.selected-row td {
+  background: rgba(0,212,255,0.12) !important;
+  color: var(--primary) !important;
 }
 
 /* 趋势数据表格 */
@@ -1274,29 +1324,51 @@ canvas#trendCanvas {
   </div>
 
   <!-- 趋势图 -->
-  <div class="trend-panel">
-    <div class="panel-title" style="display:flex; align-items:center; justify-content:space-between;">
-      <span id="trend-title">📈 趋势图（HR / SpO₂）</span>
-      <div class="trend-legend">
-        <div class="legend-item"><div class="legend-dot" style="background:#00d4ff;"></div>HR (bpm)</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#00ff88;"></div>SpO₂ (%)</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#ff3b3b; opacity:0.8;"></div>报警事件</div>
+  <div class="trend-panel" id="trend-chart-panel">
+    <div class="panel-title" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+      <span id="trend-title">📈 趋势图</span>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <div class="trend-legend" id="trend-legend" style="margin-bottom:0;"></div>
+        <button class="filter-btn" onclick="toggleTrendView()" id="trend-view-toggle-btn" title="切换为数据表视图">📋 切换数据表</button>
       </div>
+    </div>
+    <!-- 参数选择 -->
+    <div class="param-selector" id="param-selector">
+      <span style="font-size:12px; color:var(--text-dim); line-height:24px;">参数：</span>
+      <button class="param-btn active" style="color:#00d4ff; border-color:#00d4ff;" data-param="hr" onclick="toggleTrendParam('hr', this)">HR</button>
+      <button class="param-btn active" style="color:#00ff88; border-color:#00ff88;" data-param="spo2" onclick="toggleTrendParam('spo2', this)">SpO₂</button>
+      <button class="param-btn" style="color:#ff9f40; border-color:#ff9f40;" data-param="rr" onclick="toggleTrendParam('rr', this)">RR</button>
+      <button class="param-btn" style="color:#a78bfa; border-color:#a78bfa;" data-param="nibp" onclick="toggleTrendParam('nibp', this)">NIBP</button>
+      <button class="param-btn" style="color:#f87171; border-color:#f87171;" data-param="ibp" onclick="toggleTrendParam('ibp', this)">有创血压</button>
+      <button class="param-btn" style="color:#fbbf24; border-color:#fbbf24;" data-param="t1" onclick="toggleTrendParam('t1', this)">T1</button>
+      <button class="param-btn" style="color:#fb923c; border-color:#fb923c;" data-param="t2" onclick="toggleTrendParam('t2', this)">T2</button>
+    </div>
+    <!-- 参数同步信息条 -->
+    <div class="trend-sync-bar" id="trend-sync-bar">
+      <span style="color:var(--text-dim);">🕐 <span id="sync-time">--</span></span>
+      <span>HR: <span class="sync-val" id="sync-hr">--</span> bpm</span>
+      <span>SpO₂: <span class="sync-val" id="sync-spo2">--</span>%</span>
+      <span>RR: <span class="sync-val" id="sync-rr">--</span> 次/分</span>
+      <span>NIBP: <span class="sync-val" id="sync-nibp">--</span> mmHg</span>
+      <span>IBP: <span class="sync-val" id="sync-ibp">--</span> mmHg</span>
+      <span>T1: <span class="sync-val" id="sync-t1">--</span>°C</span>
+      <span>T2: <span class="sync-val" id="sync-t2">--</span>°C</span>
     </div>
     <canvas id="trendCanvas"></canvas>
   </div>
 
   <!-- 趋势数据表格 & 事件列表 -->
-  <div class="two-col">
+  <div class="two-col" id="review-bottom-row">
     <div class="review-table-panel">
       <div class="panel-title" style="display:flex; align-items:center; justify-content:space-between;">
         <span id="trend-table-title">📋 逐小时数据</span>
         <div class="toolbar-group">
           <button class="filter-btn active" onclick="setTrendTableMode('hour', this)">逐小时</button>
           <button class="filter-btn" onclick="setTrendTableMode('second', this)">逐秒（报警前1分钟）</button>
+          <button class="filter-btn" onclick="toggleTrendView()" id="review-view-toggle-btn" title="切换为趋势图视图">📈 切换趋势图</button>
         </div>
       </div>
-      <div style="max-height:400px; overflow-y:auto;">
+      <div style="max-height:400px; overflow-y:auto;" id="trend-table-wrap">
         <table class="data-table" id="trend-table">
           <thead>
             <tr>
@@ -1304,8 +1376,10 @@ canvas#trendCanvas {
               <th>HR</th>
               <th>SpO₂</th>
               <th>NIBP</th>
+              <th>有创血压</th>
               <th>RR</th>
-              <th>Temp</th>
+              <th>T1</th>
+              <th>T2</th>
             </tr>
           </thead>
           <tbody id="trend-tbody"></tbody>
@@ -1856,11 +1930,17 @@ const TREND_DATA = (() => {
       const dbp  = isAbnormal ? Math.floor(40  + Math.random() * 18) : Math.floor(65 + Math.random() * 25);
       const rr   = isAbnormal ? Math.floor(27  + Math.random() * 9)  : Math.floor(13 + Math.random() * 9);
       const temp = isAbnormal ? (38.6 + Math.random() * 1.6).toFixed(1) : (36.2 + Math.random() * 1.6).toFixed(1);
+      // 有创动脉血压：收缩压比 NIBP 偏高约 5-15 mmHg
+      const ibpSbp = isAbnormal ? Math.floor(65  + Math.random() * 20) : Math.floor(110 + Math.random() * 35);
+      const ibpDbp = isAbnormal ? Math.floor(38  + Math.random() * 18) : Math.floor(62  + Math.random() * 25);
+      // 双路体温（T1 核心体温；T2 皮肤体温，比 T1 低 0.5-1.5°C）
+      const t1 = isAbnormal ? (38.4 + Math.random() * 1.8).toFixed(1) : (36.0 + Math.random() * 1.8).toFixed(1);
+      const t2 = (Number(t1) - 0.5 - Math.random() * 1.0).toFixed(1);
       rows.push({
         date:     dateStr,
         hour:     hourStr,
         dateHour: `${dateStr} ${hourStr}`,
-        hr, spo2, sbp, dbp, rr, temp,
+        hr, spo2, sbp, dbp, rr, temp, ibpSbp, ibpDbp, t1, t2,
         isAbnormal
       });
     }
@@ -1882,176 +1962,112 @@ const ALARM_EVENTS_POINTS = (() => {
   return points.sort();
 })();
 
-/**
- * 绘制趋势图，根据 start/end（YYYY-MM-DDTHH:mm）过滤数据
- * 默认展示 2026-06-01 至 2026-06-07（前7天）
- */
-function drawTrendChart(start, end) {
-  // 默认展示前7天
-  if (!start) start = '2026-06-01T00:00';
-  if (!end)   end   = '2026-06-07T23:59';
+// 趋势图可见参数状态
+const trendVisibleParams = { hr: true, spo2: true, rr: false, nibp: false, ibp: false, t1: false, t2: false };
 
-  // 根据日期范围过滤数据（每天取第一个点代表该天，用于折线图按日聚合）
-  const startDay = start.slice(0, 10);
-  const endDay   = end.slice(0, 10);
+// 当前趋势图模式：'chart'（显示趋势图）| 'table'（仅显示表格）
+let trendViewMode = 'chart';
 
-  // 按天聚合：取每天最后一个小时的数据点（或均值）
-  const dayMap = {};
-  TREND_DATA.forEach(d => {
-    if (d.date >= startDay && d.date <= endDay) {
-      if (!dayMap[d.date]) dayMap[d.date] = [];
-      dayMap[d.date].push(d);
-    }
-  });
+// 趋势图参数配置
+const TREND_PARAM_CONFIG = {
+  hr:   { label: 'HR (bpm)',      color: '#00d4ff', min: 40,   max: 180,  getValue: d => d.hr },
+  spo2: { label: 'SpO₂ (%)',      color: '#00ff88', min: 70,   max: 105,  getValue: d => d.spo2 },
+  rr:   { label: 'RR (次/分)',    color: '#ff9f40', min: 8,    max: 40,   getValue: d => d.rr },
+  nibp: { label: 'NIBP-S (mmHg)', color: '#a78bfa', min: 50,   max: 200,  getValue: d => d.sbp },
+  ibp:  { label: 'IBP-S (mmHg)',  color: '#f87171', min: 50,   max: 200,  getValue: d => d.ibpSbp },
+  t1:   { label: 'T1 (°C)',       color: '#fbbf24', min: 34,   max: 42,   getValue: d => Number(d.t1) },
+  t2:   { label: 'T2 (°C)',       color: '#fb923c', min: 33,   max: 41,   getValue: d => Number(d.t2) },
+};
 
-  // 按日期排序，每天取均值
-  const days = Object.keys(dayMap).sort();
-  const chartData = days.map(date => {
-    const recs = dayMap[date];
-    const avgHr   = Math.round(recs.reduce((s, r) => s + r.hr,   0) / recs.length);
-    const avgSpo2 = Math.round(recs.reduce((s, r) => s + r.spo2, 0) / recs.length);
-    const hasAbnormal = recs.some(r => r.isAbnormal);
-    return { date, hr: avgHr, spo2: avgSpo2, isAbnormal: hasAbnormal };
-  });
+// 当前趋势图使用的 chartData（供 canvas click handler 引用）
+let trendChartDataRef = [];
+let trendChartLayout = { padL: 48, padR: 20, padT: 20, padB: 36, xStep: 0, xOffset: 0 };
 
-  const canvas = document.getElementById('trendCanvas');
-  const container = canvas.parentElement;
-  const CHART_PADDING = 32;
-  canvas.width  = container.clientWidth - CHART_PADDING;
-  canvas.height = 260;
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
-  const padL = 48, padR = 20, padT = 20, padB = 36;
-  const chartW = W - padL - padR;
-  const chartH = H - padT - padB;
-  const n = chartData.length;
-
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = '#050a14';
-  ctx.fillRect(0, 0, W, H);
-
-  if (n === 0) {
-    ctx.fillStyle = '#5a7a9a';
-    ctx.font = '14px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('无数据', W / 2, H / 2);
-    return;
-  }
-
-  // 网格
-  ctx.strokeStyle = 'rgba(30,45,74,0.7)';
-  ctx.lineWidth = 1;
-  for (let i = 0; i <= 6; i++) {
-    const y = padT + (chartH / 6) * i;
-    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + chartW, y); ctx.stroke();
-  }
-  // 单点时居中显示，多点时均匀分布；xOffset 用于单点居中偏移
-  const xStep   = n > 1 ? chartW / (n - 1) : chartW;
-  const xOffset = n === 1 ? chartW / 2 : 0;
-  for (let i = 0; i < n; i++) {
-    const x = padL + xOffset + xStep * i;
-    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + chartH); ctx.stroke();
-  }
-
-  // HR 折线 (范围 40-180)
-  function hrY(v)   { return padT + chartH - ((v - 40)  / 140) * chartH; }
-  // SpO2 折线 (范围 70-105)
-  function spo2Y(v) { return padT + chartH - ((v - 70)  / 35)  * chartH; }
-
-  // 绘制当前范围内的报警事件竖线
-  ALARM_EVENTS_POINTS.forEach(dh => {
-    const dateOfDh = dh.slice(0, 10);
-    const idx = days.indexOf(dateOfDh);
-    if (idx === -1) return;
-    const x = padL + xOffset + xStep * idx;
-    ctx.strokeStyle = 'rgba(255,59,59,0.6)';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + chartH); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = 'rgba(255,59,59,0.8)';
-    ctx.font = '10px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('⚠', x, padT + 12);
-  });
-
-  // HR 折线
-  ctx.strokeStyle = '#00d4ff';
-  ctx.lineWidth = 2;
-  ctx.shadowBlur = 4;
-  ctx.shadowColor = '#00d4ff';
-  ctx.beginPath();
-  chartData.forEach((d, i) => {
-    const x = padL + xOffset + xStep * i;
-    const y = hrY(d.hr);
-    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-  });
-  ctx.stroke();
-
-  // HR 数据点
-  ctx.fillStyle = '#00d4ff';
-  chartData.forEach((d, i) => {
-    const x = padL + xOffset + xStep * i;
-    ctx.beginPath();
-    ctx.arc(x, hrY(d.hr), d.isAbnormal ? 5 : 3, 0, Math.PI * 2);
-    ctx.fill();
-  });
-
-  // SpO2 折线
-  ctx.strokeStyle = '#00ff88';
-  ctx.shadowColor = '#00ff88';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  chartData.forEach((d, i) => {
-    const x = padL + xOffset + xStep * i;
-    const y = spo2Y(d.spo2);
-    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-  });
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-
-  // X 轴刻度标签（显示日期 MM/DD，最多显示10个标签防止拥挤）
-  ctx.fillStyle = '#5a7a9a';
-  ctx.font = '10px monospace';
-  ctx.textAlign = 'center';
-  const labelStep = Math.max(1, Math.ceil(n / 10));
-  days.forEach((date, i) => {
-    if (i % labelStep !== 0 && i !== n - 1) return;
-    const x = padL + xOffset + xStep * i;
-    const label = date.slice(5).replace('-', '/'); // MM/DD
-    ctx.fillText(label, x, H - 8);
-  });
-
-  // Y 轴标签（左侧，HR 值）
-  ctx.textAlign = 'right';
-  ctx.fillStyle = '#00d4ff';
-  [60, 80, 100, 120, 140].forEach(v => {
-    ctx.fillText(v, padL - 4, hrY(v) + 4);
-  });
+function toggleTrendParam(key, btn) {
+  trendVisibleParams[key] = !trendVisibleParams[key];
+  btn.classList.toggle('active', trendVisibleParams[key]);
+  const start = document.getElementById('time-start').value;
+  const end   = document.getElementById('time-end').value;
+  drawTrendChart(start, end);
 }
 
+function toggleTrendView() {
+  trendViewMode = trendViewMode === 'chart' ? 'table' : 'chart';
+  const chartPanel = document.getElementById('trend-chart-panel');
+  const toggleBtn = document.getElementById('trend-view-toggle-btn');
+  const tableToggleBtn = document.getElementById('review-view-toggle-btn');
+  if (trendViewMode === 'table') {
+    chartPanel.style.display = 'none';
+    if (toggleBtn) { toggleBtn.textContent = '📈 切换趋势图'; toggleBtn.title = '切换为趋势图视图'; }
+    if (tableToggleBtn) { tableToggleBtn.textContent = '📈 切换趋势图'; }
+  } else {
+    chartPanel.style.display = '';
+    if (toggleBtn) { toggleBtn.textContent = '📋 切换数据表'; toggleBtn.title = '切换为数据表视图'; }
+    if (tableToggleBtn) { tableToggleBtn.textContent = '📋 切换数据表'; }
+    const start = document.getElementById('time-start').value;
+    const end   = document.getElementById('time-end').value;
+    drawTrendChart(start, end);
+  }
+}
+
+function updateTrendLegend() {
+  const container = document.getElementById('trend-legend');
+  if (!container) return;
+  const activeParams = Object.keys(trendVisibleParams).filter(k => trendVisibleParams[k]);
+  container.innerHTML = activeParams.map(k => {
+    const cfg = TREND_PARAM_CONFIG[k];
+    return `<div class="legend-item"><div class="legend-dot" style="background:${cfg.color};"></div>${cfg.label}</div>`;
+  }).concat([`<div class="legend-item"><div class="legend-dot" style="background:#ff3b3b; opacity:0.8;"></div>报警事件</div>`]).join('');
+}
+
+
 /**
- * 渲染趋势数据表格，根据 start/end（YYYY-MM-DDTHH:mm）过滤
+ * 处理趋势图 canvas 点击：找到最近数据点，在同步栏和表格中高亮对应时间点
  */
-function renderTrendTable(start, end) {
-  if (!start) start = '2026-06-01T00:00';
-  if (!end)   end   = '2026-06-07T23:59';
-  // 数据只按小时记录（HH:00），将开始/结束时间向下取整到整点进行比较
-  // endKey 末位改为 :59 以确保包含当前小时内的所有整点记录
-  const startKey = start.replace('T', ' ').slice(0, 13) + ':00'; // YYYY-MM-DD HH:00
-  const endKey   = end.replace('T', ' ').slice(0, 13)   + ':59'; // YYYY-MM-DD HH:59（包含当前整点）
-  const filtered = TREND_DATA.filter(d => d.dateHour >= startKey && d.dateHour <= endKey);
-  const tbody = document.getElementById('trend-tbody');
-  tbody.innerHTML = filtered.map(d => `
-    <tr class="${d.isAbnormal ? 'abnormal' : ''}">
-      <td style="font-family:monospace;white-space:nowrap">${d.dateHour}</td>
-      <td>${d.hr}</td>
-      <td>${d.spo2}%</td>
-      <td>${d.sbp}/${d.dbp}</td>
-      <td>${d.rr}</td>
-      <td>${d.temp}°C</td>
-    </tr>
-  `).join('');
+function onTrendCanvasClick(e) {
+  const canvas = document.getElementById('trendCanvas');
+  if (!canvas || !trendChartDataRef.length) return;
+  const rect = canvas.getBoundingClientRect();
+  // CSS width may differ from canvas pixel width; scale accordingly
+  const scaleX = canvas.width / rect.width;
+  const clickX = (e.clientX - rect.left) * scaleX;
+  const { padL, xStep, xOffset } = trendChartLayout;
+
+  // Find nearest data point index
+  let nearestIdx = 0, minDist = Infinity;
+  trendChartDataRef.forEach((d, i) => {
+    const x = padL + xOffset + xStep * i;
+    const dist = Math.abs(clickX - x);
+    if (dist < minDist) { minDist = dist; nearestIdx = i; }
+  });
+  if (minDist > xStep * 0.6) return; // too far from any point
+
+  const d = trendChartDataRef[nearestIdx];
+  if (!d) return;
+
+  // Update sync bar
+  const syncBar = document.getElementById('trend-sync-bar');
+  if (syncBar) {
+    syncBar.classList.add('visible');
+    document.getElementById('sync-time').textContent  = d.date;
+    document.getElementById('sync-hr').textContent    = d.hr;
+    document.getElementById('sync-spo2').textContent  = d.spo2;
+    document.getElementById('sync-rr').textContent    = d.rr;
+    document.getElementById('sync-nibp').textContent  = `${d.sbp}/${d.dbp}`;
+    document.getElementById('sync-ibp').textContent   = `${d.ibpSbp}/${d.ibpDbp}`;
+    document.getElementById('sync-t1').textContent    = d.t1;
+    document.getElementById('sync-t2').textContent    = d.t2;
+  }
+
+  // Highlight matching rows in the data table (all hourly rows for that date)
+  document.querySelectorAll('#trend-tbody tr').forEach(row => {
+    const rowDate = (row.getAttribute('data-dateHour') || '').slice(0, 10);
+    row.classList.toggle('selected-row', rowDate === d.date);
+  });
+
+  // Scroll to first matching row
+  const firstMatch = document.querySelector(`#trend-tbody tr[data-dateHour^="${d.date}"]`);
+  if (firstMatch) firstMatch.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
 // 30条事件数据，时间分布在 2026-06-01 至 2026-07-12
@@ -2250,6 +2266,10 @@ function init() {
   renderEvents('all', '2026-06-01T00:00', '2026-07-12T23:59');
   renderAlarmTable();
   updateClock();
+
+  // 趋势图 canvas 点击同步
+  const trendCanvas = document.getElementById('trendCanvas');
+  if (trendCanvas) trendCanvas.addEventListener('click', onTrendCanvasClick);
 
   // 定时任务
   setInterval(updateClock, 1000);
@@ -2644,67 +2664,86 @@ function showPreAlarmTrend(date, time) {
 }
 
 function drawTrendChart(start, end, secondData, eventMeta) {
-  if (!secondData) {
+  if (secondData) {
+    // 报警前1分钟逐秒趋势（special mode）
     const title = document.getElementById('trend-title');
-    if (title) title.textContent = '📈 趋势图（HR / SpO₂）';
-    if (!start) start = '2026-06-01T00:00';
-    if (!end) end = '2026-06-07T23:59';
-    const startDay = start.slice(0, 10);
-    const endDay = end.slice(0, 10);
-    const dayMap = {};
-    TREND_DATA.forEach(d => {
-      if (d.date >= startDay && d.date <= endDay) {
-        if (!dayMap[d.date]) dayMap[d.date] = [];
-        dayMap[d.date].push(d);
-      }
-    });
-    const days = Object.keys(dayMap).sort();
-    const chartData = days.map(date => {
-      const recs = dayMap[date];
-      return { date, hr: Math.round(recs.reduce((s, r) => s + r.hr, 0) / recs.length), spo2: Math.round(recs.reduce((s, r) => s + r.spo2, 0) / recs.length) };
-    });
+    if (title) title.textContent = `📈 报警前1分钟趋势（${eventMeta.desc} @ ${eventMeta.date} ${eventMeta.time}）`;
     const canvas = document.getElementById('trendCanvas');
     canvas.width = canvas.parentElement.clientWidth - 32; canvas.height = 260;
     const ctx = canvas.getContext('2d');
     const W = canvas.width, H = canvas.height, pad = { l: 48, r: 20, t: 20, b: 36 };
     const cw = W - pad.l - pad.r, ch = H - pad.t - pad.b;
     ctx.fillStyle = '#050a14'; ctx.fillRect(0, 0, W, H);
-    if (!chartData.length) return;
     ctx.strokeStyle = 'rgba(30,45,74,0.7)';
     for (let i = 0; i <= 6; i++) { const y = pad.t + ch * i / 6; ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + cw, y); ctx.stroke(); }
-    const xStep = chartData.length > 1 ? cw / (chartData.length - 1) : cw;
-    const xOffset = chartData.length === 1 ? cw / 2 : 0;
+    const xStep = cw / (secondData.length - 1);
     const hrY = v => pad.t + ch - ((v - 40) / 140) * ch;
     const spo2Y = v => pad.t + ch - ((v - 70) / 35) * ch;
-    ALARM_EVENTS_POINTS.forEach(dh => {
-      const idx = days.indexOf(dh.slice(0, 10));
-      if (idx < 0) return;
-      const x = pad.l + xOffset + idx * xStep;
-      ctx.strokeStyle = 'rgba(255,59,59,0.6)';
-      ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + ch); ctx.stroke(); ctx.setLineDash([]);
-    });
     ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 2; ctx.beginPath();
-    chartData.forEach((d, i) => { const x = pad.l + xOffset + i * xStep; const y = hrY(d.hr); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+    secondData.forEach((d, i) => { const x = pad.l + i * xStep; const y = hrY(d.hr); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
     ctx.strokeStyle = '#00ff88'; ctx.beginPath();
-    chartData.forEach((d, i) => { const x = pad.l + xOffset + i * xStep; const y = spo2Y(d.spo2); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+    secondData.forEach((d, i) => { const x = pad.l + i * xStep; const y = spo2Y(d.spo2); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+    const alarmX = pad.l + (secondData.length - 1) * xStep;
+    ctx.strokeStyle = 'rgba(255,59,59,0.8)'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(alarmX, pad.t); ctx.lineTo(alarmX, pad.t + ch); ctx.stroke(); ctx.setLineDash([]);
     return;
   }
+  // Normal multi-param trend chart
   const title = document.getElementById('trend-title');
-  if (title) title.textContent = `📈 报警前1分钟趋势（${eventMeta.desc} @ ${eventMeta.date} ${eventMeta.time}）`;
+  if (title) title.textContent = '📈 趋势图';
+  if (!start) start = '2026-06-01T00:00';
+  if (!end) end = '2026-06-07T23:59';
+  updateTrendLegend();
+  const startDay = start.slice(0, 10), endDay = end.slice(0, 10);
+  const dayMap = {};
+  TREND_DATA.forEach(d => {
+    if (d.date >= startDay && d.date <= endDay) {
+      if (!dayMap[d.date]) dayMap[d.date] = [];
+      dayMap[d.date].push(d);
+    }
+  });
+  const days = Object.keys(dayMap).sort();
+  const chartData = days.map(date => {
+    const recs = dayMap[date];
+    const avg = key => { const vals = recs.map(r => Number(r[key])).filter(v => !isNaN(v)); return vals.length ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length * 10) / 10 : 0; };
+    return { date, hr: avg('hr'), spo2: avg('spo2'), rr: avg('rr'), sbp: avg('sbp'), dbp: avg('dbp'), ibpSbp: avg('ibpSbp'), ibpDbp: avg('ibpDbp'), t1: avg('t1'), t2: avg('t2'), isAbnormal: recs.some(r => r.isAbnormal) };
+  });
+  trendChartDataRef = chartData;
   const canvas = document.getElementById('trendCanvas');
   canvas.width = canvas.parentElement.clientWidth - 32; canvas.height = 260;
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height, pad = { l: 48, r: 20, t: 20, b: 36 };
   const cw = W - pad.l - pad.r, ch = H - pad.t - pad.b;
+  const n = chartData.length;
   ctx.fillStyle = '#050a14'; ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = 'rgba(30,45,74,0.7)'; for (let i = 0; i <= 6; i++) { const y = pad.t + ch * i / 6; ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + cw, y); ctx.stroke(); }
-  const xStep = cw / (secondData.length - 1);
-  const hrY = v => pad.t + ch - ((v - 40) / 140) * ch;
-  const spo2Y = v => pad.t + ch - ((v - 70) / 35) * ch;
-  ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 2; ctx.beginPath(); secondData.forEach((d, i) => { const x = pad.l + i * xStep; const y = hrY(d.hr); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
-  ctx.strokeStyle = '#00ff88'; ctx.beginPath(); secondData.forEach((d, i) => { const x = pad.l + i * xStep; const y = spo2Y(d.spo2); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
-  const alarmX = pad.l + (secondData.length - 1) * xStep;
-  ctx.strokeStyle = 'rgba(255,59,59,0.8)'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(alarmX, pad.t); ctx.lineTo(alarmX, pad.t + ch); ctx.stroke(); ctx.setLineDash([]);
+  if (!n) { ctx.fillStyle = '#5a7a9a'; ctx.font = '14px monospace'; ctx.textAlign = 'center'; ctx.fillText('无数据', W / 2, H / 2); return; }
+  ctx.strokeStyle = 'rgba(30,45,74,0.7)';
+  for (let i = 0; i <= 6; i++) { const y = pad.t + ch * i / 6; ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + cw, y); ctx.stroke(); }
+  const xStep = n > 1 ? cw / (n - 1) : cw, xOffset = n === 1 ? cw / 2 : 0;
+  trendChartLayout = { padL: pad.l, padR: pad.r, padT: pad.t, padB: pad.b, xStep, xOffset };
+  for (let i = 0; i < n; i++) { const x = pad.l + xOffset + i * xStep; ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + ch); ctx.stroke(); }
+  ALARM_EVENTS_POINTS.forEach(dh => {
+    const idx = days.indexOf(dh.slice(0, 10)); if (idx < 0) return;
+    const x = pad.l + xOffset + idx * xStep;
+    ctx.strokeStyle = 'rgba(255,59,59,0.6)'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + ch); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,59,59,0.8)'; ctx.font = '10px monospace'; ctx.textAlign = 'center'; ctx.fillText('⚠', x, pad.t + 12);
+  });
+  const activeParams = Object.keys(trendVisibleParams).filter(k => trendVisibleParams[k]);
+  activeParams.forEach(key => {
+    const cfg = TREND_PARAM_CONFIG[key];
+    const norm = v => pad.t + ch - ((v - cfg.min) / (cfg.max - cfg.min)) * ch;
+    ctx.strokeStyle = cfg.color; ctx.lineWidth = 2; ctx.shadowBlur = 4; ctx.shadowColor = cfg.color;
+    ctx.beginPath(); chartData.forEach((d, i) => { const x = pad.l + xOffset + i * xStep; const y = norm(cfg.getValue(d)); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+    ctx.shadowBlur = 0; ctx.fillStyle = cfg.color;
+    chartData.forEach((d, i) => { const x = pad.l + xOffset + i * xStep; ctx.beginPath(); ctx.arc(x, norm(cfg.getValue(d)), d.isAbnormal ? 5 : 3, 0, Math.PI * 2); ctx.fill(); });
+  });
+  ctx.fillStyle = '#5a7a9a'; ctx.font = '10px monospace'; ctx.textAlign = 'center';
+  const labelStep = Math.max(1, Math.ceil(n / 10));
+  days.forEach((date, i) => { if (i % labelStep !== 0 && i !== n - 1) return; ctx.fillText(date.slice(5).replace('-', '/'), pad.l + xOffset + i * xStep, H - 8); });
+  if (activeParams.length) {
+    const firstCfg = TREND_PARAM_CONFIG[activeParams[0]];
+    ctx.textAlign = 'right'; ctx.fillStyle = firstCfg.color;
+    for (let i = 0; i <= 5; i++) { const v = firstCfg.min + (firstCfg.max - firstCfg.min) * (i / 5); ctx.fillText(Math.round(v), pad.l - 4, pad.t + ch - (i / 5) * ch + 4); }
+  }
 }
 
 function setTrendTableMode(mode, btn) {
@@ -2723,7 +2762,7 @@ function renderTrendTable(start, end) {
     const data = selectedTrendSeconds.length ? selectedTrendSeconds : buildPreAlarmData(EVENTS_DATA.find(e => e.type === 'alarm'));
     tbody.innerHTML = data.map(d => {
       const abnormal = d.hr > HR_HIGH_THRESHOLD || d.hr < HR_LOW_THRESHOLD || d.spo2 < SPO2_LOW_THRESHOLD;
-      return `<tr class="${abnormal ? 'abnormal' : ''}"><td style="font-family:monospace">${d.time}</td><td>${d.hr}</td><td>${d.spo2}%</td><td>${d.nibp}</td><td>${d.rr}</td><td>${d.temp}°C</td></tr>`;
+      return `<tr class="${abnormal ? 'abnormal' : ''}"><td style="font-family:monospace">${d.time}</td><td>${d.hr}</td><td>${d.spo2}%</td><td>${d.nibp}</td><td>—/—</td><td>${d.rr}</td><td>${d.temp}°C</td><td>—</td></tr>`;
     }).join('');
     return;
   }
@@ -2732,11 +2771,12 @@ function renderTrendTable(start, end) {
   const startKey = start.replace('T', ' ').slice(0, 13) + ':00';
   const endKey = end.replace('T', ' ').slice(0, 13) + ':59';
   const filtered = TREND_DATA.filter(d => d.dateHour >= startKey && d.dateHour <= endKey);
-  tbody.innerHTML = filtered.map(d => {
-    const abnormal = d.hr > HR_HIGH_THRESHOLD || d.hr < HR_LOW_THRESHOLD || d.spo2 < SPO2_LOW_THRESHOLD || d.rr > 30 || Number(d.temp) > 38.5;
-    return `<tr class="${abnormal ? 'abnormal' : ''}"><td style="font-family:monospace;white-space:nowrap">${d.dateHour}</td><td>${d.hr}</td><td>${d.spo2}%</td><td>${d.sbp}/${d.dbp}</td><td>${d.rr}</td><td>${d.temp}°C</td></tr>`;
+  tbody.innerHTML = filtered.map((d, idx) => {
+    const abnormal = d.hr > HR_HIGH_THRESHOLD || d.hr < HR_LOW_THRESHOLD || d.spo2 < SPO2_LOW_THRESHOLD || d.rr > 30 || Number(d.t1) > 38.5;
+    return `<tr class="${abnormal ? 'abnormal' : ''}" data-dateHour="${d.dateHour}" data-row-idx="${idx}"><td style="font-family:monospace;white-space:nowrap">${d.dateHour}</td><td>${d.hr}</td><td>${d.spo2}%</td><td>${d.sbp}/${d.dbp}</td><td>${d.ibpSbp}/${d.ibpDbp}</td><td>${d.rr}</td><td>${d.t1}°C</td><td>${d.t2}°C</td></tr>`;
   }).join('');
 }
+
 
 function renderEvents(filter, start, end) {
   const list = document.getElementById('event-list');
