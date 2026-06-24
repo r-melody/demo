@@ -754,6 +754,84 @@ canvas#trendCanvas {
 .alarm-modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:12px; }
 .alarm-confirm { background:var(--danger-dim); color:var(--danger); border-color:var(--danger); }
 
+/* 报警通知容器 —— 固定右下角，不拦截点击 */
+.alarm-toaster {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  width: 360px;
+  pointer-events: none;
+}
+
+/* 单条报警通知卡片 */
+.alarm-toast {
+  background: var(--card);
+  border: 1px solid var(--danger);
+  border-left: 4px solid var(--danger);
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 4px 20px rgba(255,59,59,0.35);
+  pointer-events: all;
+  animation: toast-in 0.3s ease;
+  position: relative;
+}
+
+.alarm-toast.closing {
+  animation: toast-out 0.3s ease forwards;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(40px); }
+}
+
+.alarm-toast-title {
+  color: var(--danger);
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 6px;
+  animation: text-blink 1s infinite;
+  padding-right: 20px;
+}
+
+.alarm-toast-body {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.alarm-toast-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.alarm-toast-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  font-family: var(--font);
+}
+
+.alarm-toast-close:hover { color: var(--text); }
+
 .section-toggle { width:100%; text-align:left; background:var(--card2); border:1px solid var(--border); color:var(--text); padding:8px 10px; border-radius:6px; cursor:pointer; }
 .section-body { padding:10px 4px 14px; display:block; }
 .report-view canvas { width:100%; background:#050a14; border:1px solid var(--border); border-radius:6px; margin-top:8px; }
@@ -1142,16 +1220,6 @@ canvas#trendCanvas {
   </div>
 </div>
 
-<div class="alarm-overlay" id="alarm-overlay" style="display:none;">
-  <div class="alarm-modal">
-    <div class="alarm-modal-title" id="alarm-modal-title">⚠ 危急报警</div>
-    <div class="alarm-modal-body" id="alarm-modal-body"></div>
-    <div class="alarm-modal-actions">
-      <button class="filter-btn alarm-confirm" onclick="confirmAlarm()">确认报警</button>
-      <button class="filter-btn" onclick="viewAlarmDetail()">查看详情</button>
-    </div>
-  </div>
-</div>
 <div class="alarm-overlay" id="event-report-overlay" style="display:none;">
   <div class="alarm-modal" style="width:700px;">
     <div class="alarm-modal-title">📄 事件报告</div>
@@ -1922,8 +1990,6 @@ const deptVisibleFields = { hr: true, spo2: true, nibp: true, rr: true, temp: tr
 const patientVisibleFields = { hr: true, spo2: true, nibp: true, rr: true, temp: true };
 const ventCentralFields = { vt: true, peep: true, fio2: true, ppeak: true, rr: true };
 const ventPatientFields = { vt: true, peep: true, fio2: true, ppeak: true, rr: true };
-const alarmQueue = [];
-let activeAlarm = null;
 const alarmCooldown = {};
 const VENT_DATA = PATIENTS.map((p, i) => ({
   bed: p.bed, name: p.name, patientIndex: i,
@@ -2069,33 +2135,51 @@ function updateDetailPanel() {
   Object.keys(patientVisibleFields).forEach(k => setPatientField(k, patientVisibleFields[k]));
 }
 
-function enqueueAlarm(alarm) {
-  alarmQueue.push(alarm);
-  if (!activeAlarm) showNextAlarm();
-}
-function showNextAlarm() {
-  if (!alarmQueue.length) {
-    activeAlarm = null;
-    document.getElementById('alarm-overlay').style.display = 'none';
-    return;
+function showAlarm(alarm) {
+  const toaster = document.getElementById('alarm-toaster');
+  const toast = document.createElement('div');
+  toast.className = 'alarm-toast';
+  let bodyText = alarm.desc || alarm.message || '';
+  if (!bodyText && alarm.type) {
+    bodyText = alarm.type + '：' + (alarm.value || '') + (alarm.threshold ? '（阈值 ' + alarm.threshold + '）' : '');
   }
-  activeAlarm = alarmQueue[0];
-  document.getElementById('alarm-overlay').style.display = 'flex';
-  document.getElementById('alarm-modal-title').textContent = `${activeAlarm.withBell ? '🔔 ' : ''}⚠ 危急报警`;
-  document.getElementById('alarm-modal-body').innerHTML = `
-    <div>床号：${activeAlarm.bed}</div>
-    <div>患者：${activeAlarm.patient}</div>
-    <div>报警参数：${activeAlarm.type}</div>
-    <div>当前值：${activeAlarm.value}</div>
-    <div>阈值：${activeAlarm.threshold}</div>
+  if (!bodyText && alarm.patient) bodyText = '患者：' + alarm.patient;
+  toast.innerHTML = `
+    <button class="alarm-toast-close" title="关闭">×</button>
+    <div class="alarm-toast-title">${alarm.withBell ? '🔔 ' : ''}🚨 危急报警 — ${esc(alarm.bed || '')}</div>
+    <div class="alarm-toast-body">${esc(bodyText)}</div>
+    <div class="alarm-toast-actions">
+      <button class="filter-btn">稍后处理</button>
+      <button class="handle-btn alarm-confirm">确认报警</button>
+    </div>
   `;
+  const alarmId = alarm.id || '';
+  toast.querySelector('.alarm-toast-close').addEventListener('click', () => dismissToast(toast));
+  toast.querySelector('.alarm-toast-actions .filter-btn').addEventListener('click', () => dismissToast(toast));
+  toast.querySelector('.alarm-confirm').addEventListener('click', function() { confirmAlarm(this, alarmId); });
+  toaster.appendChild(toast);
 }
-function confirmAlarm() { alarmQueue.shift(); showNextAlarm(); }
-function viewAlarmDetail() {
-  if (!activeAlarm) return;
-  confirmAlarm();
-  if (activeAlarm.vent) { ventSelectedPatient = activeAlarm.index; switchTab('vent-patient'); }
-  else { openPatient(activeAlarm.index); }
+
+function dismissToast(el) {
+  const toast = el.closest ? el.closest('.alarm-toast') : el;
+  if (!toast) return;
+  toast.classList.add('closing');
+  toast.addEventListener('animationend', () => toast.remove(), { once: true });
+}
+
+function confirmAlarm(btn, alarmId) {
+  if (alarmId) {
+    const row = document.querySelector(`[data-alarm-id="${alarmId}"]`) || document.getElementById(`alarm-row-${alarmId}`);
+    if (row) {
+      const statusCell = row.querySelector('.status-dot');
+      if (statusCell) { statusCell.className = 'status-dot handled'; }
+      const handleBtn = row.querySelector('.handle-btn');
+      if (handleBtn) { handleBtn.disabled = true; handleBtn.textContent = '已处理'; }
+      row.classList.remove('unhandled');
+    }
+  }
+  dismissToast(btn);
+  showToast('报警已确认');
 }
 
 function maybeTriggerAlarm(source, i, type, value, threshold, withBell, vent = false) {
@@ -2104,7 +2188,7 @@ function maybeTriggerAlarm(source, i, type, value, threshold, withBell, vent = f
   if (alarmCooldown[key] && now - alarmCooldown[key] < ALARM_COOLDOWN_MS) return;
   alarmCooldown[key] = now;
   const p = PATIENTS[i];
-  enqueueAlarm({ bed: p.bed, patient: p.name, type, value, threshold, index: i, withBell, vent });
+  showAlarm({ bed: p.bed, patient: p.name, type, value, threshold, index: i, withBell, vent });
 }
 
 function updateVitals() {
@@ -2491,5 +2575,7 @@ window.addEventListener('resize', () => {
   if (document.getElementById('module-vent-patient').classList.contains('active')) startVentWave();
 });
 </script>
+<!-- 非阻断式报警通知容器 -->
+<div class="alarm-toaster" id="alarm-toaster"></div>
 </body>
 </html>
