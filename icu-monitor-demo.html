@@ -740,6 +740,33 @@ canvas#trendCanvas {
 
 /* ===== 网格布局辅助 ===== */
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+.module-toolbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:10px; flex-wrap:wrap; }
+.toolbar-group { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.toolbar-label { font-size:12px; color:var(--text-dim); }
+.field-panel { display:none; margin-bottom:12px; padding:10px; border:1px solid var(--border); border-radius:8px; background:var(--card2); }
+.field-panel label { margin-right:14px; font-size:12px; color:var(--text); }
+
+.alarm-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; display:flex; align-items:center; justify-content:center; }
+.alarm-modal { background:var(--card); border:1px solid var(--danger); border-radius:12px; width:480px; padding:16px; }
+.alarm-modal-title { color:var(--danger); font-weight:700; font-size:20px; margin-bottom:10px; animation:text-blink 1s infinite; }
+.alarm-modal-body { font-size:14px; line-height:1.8; }
+.alarm-modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:12px; }
+.alarm-confirm { background:var(--danger-dim); color:var(--danger); border-color:var(--danger); }
+
+.section-toggle { width:100%; text-align:left; background:var(--card2); border:1px solid var(--border); color:var(--text); padding:8px 10px; border-radius:6px; cursor:pointer; }
+.section-body { padding:10px 4px 14px; display:block; }
+.report-view canvas { width:100%; background:#050a14; border:1px solid var(--border); border-radius:6px; margin-top:8px; }
+.report-table { width:100%; border-collapse:collapse; margin-top:8px; font-size:12px; }
+.report-table td, .report-table th { border:1px solid var(--border); padding:6px; }
+
+.toast { position:fixed; right:24px; bottom:24px; background:var(--card2); border:1px solid var(--primary); border-radius:8px; padding:10px 14px; z-index:10000; display:none; }
+
+@media print {
+  body * { visibility:hidden; }
+  #report-view, #report-view * { visibility:visible; }
+  #report-view { position:absolute; left:0; top:0; width:100%; }
+}
 </style>
 </head>
 <body>
@@ -752,6 +779,10 @@ canvas#trendCanvas {
     <button class="nav-tab" onclick="switchTab('patient')">单患者详情</button>
     <button class="nav-tab" onclick="switchTab('review')">数据回顾</button>
     <button class="nav-tab" onclick="switchTab('alarm')">报警事件</button>
+    <button class="nav-tab" onclick="switchTab('vent-central')">通气大屏</button>
+    <button class="nav-tab" onclick="switchTab('vent-patient')">单患者通气</button>
+    <button class="nav-tab" onclick="switchTab('waveform')">波形回顾</button>
+    <button class="nav-tab" onclick="switchTab('report')">监护报告</button>
   </div>
 </div>
 
@@ -776,6 +807,19 @@ canvas#trendCanvas {
     </div>
     <div class="dept-time" id="dept-clock">--:--:--</div>
   </div>
+
+  <div class="module-toolbar">
+    <div class="toolbar-group">
+      <span class="toolbar-label">布局</span>
+      <button class="filter-btn" onclick="setDeptGridCols(2, this)">2列</button>
+      <button class="filter-btn" onclick="setDeptGridCols(3, this)">3列</button>
+      <button class="filter-btn active" onclick="setDeptGridCols(4, this)">4列</button>
+    </div>
+    <div class="toolbar-group">
+      <button class="filter-btn" onclick="toggleFieldPanel('dept-field-panel')">自定义字段</button>
+    </div>
+  </div>
+  <div class="field-panel" id="dept-field-panel"></div>
 
   <!-- 床位卡片 4×2 -->
   <div class="bed-grid" id="bed-grid"></div>
@@ -808,7 +852,9 @@ canvas#trendCanvas {
       </div>
     </div>
     <button class="back-btn" onclick="switchTab('dept')">← 返回大屏</button>
+    <button class="filter-btn" onclick="toggleFieldPanel('patient-field-panel')">自定义字段</button>
   </div>
+  <div class="field-panel" id="patient-field-panel"></div>
 
   <!-- 主体：左侧参数 + 右侧ECG -->
   <div class="detail-layout">
@@ -907,7 +953,7 @@ canvas#trendCanvas {
   <!-- 趋势图 -->
   <div class="trend-panel">
     <div class="panel-title" style="display:flex; align-items:center; justify-content:space-between;">
-      <span>📈 趋势图（HR / SpO₂）</span>
+      <span id="trend-title">📈 趋势图（HR / SpO₂）</span>
       <div class="trend-legend">
         <div class="legend-item"><div class="legend-dot" style="background:#00d4ff;"></div>HR (bpm)</div>
         <div class="legend-item"><div class="legend-dot" style="background:#00ff88;"></div>SpO₂ (%)</div>
@@ -920,7 +966,13 @@ canvas#trendCanvas {
   <!-- 趋势数据表格 & 事件列表 -->
   <div class="two-col">
     <div class="review-table-panel">
-      <div class="panel-title">📋 逐小时数据</div>
+      <div class="panel-title" style="display:flex; align-items:center; justify-content:space-between;">
+        <span id="trend-table-title">📋 逐小时数据</span>
+        <div class="toolbar-group">
+          <button class="filter-btn active" onclick="setTrendTableMode('hour', this)">逐小时</button>
+          <button class="filter-btn" onclick="setTrendTableMode('second', this)">逐秒（报警前1分钟）</button>
+        </div>
+      </div>
       <div style="max-height:400px; overflow-y:auto;">
         <table class="data-table" id="trend-table">
           <thead>
@@ -1000,6 +1052,118 @@ canvas#trendCanvas {
     </table>
   </div>
 </div>
+
+<div id="module-vent-central" class="module">
+  <div class="dept-header">
+    <div class="dept-title">🫁 机械通气中央监护</div>
+    <div class="module-toolbar" style="margin-bottom:0;">
+      <div class="toolbar-group">
+        <span class="toolbar-label">布局</span>
+        <button class="filter-btn" onclick="setVentGridCols(2, this)">2列</button>
+        <button class="filter-btn" onclick="setVentGridCols(3, this)">3列</button>
+        <button class="filter-btn active" onclick="setVentGridCols(4, this)">4列</button>
+      </div>
+      <button class="filter-btn" onclick="toggleFieldPanel('vent-central-field-panel')">自定义字段</button>
+    </div>
+  </div>
+  <div class="field-panel" id="vent-central-field-panel"></div>
+  <div class="bed-grid" id="vent-central-grid"></div>
+</div>
+
+<div id="module-vent-patient" class="module">
+  <div class="patient-header">
+    <div class="patient-name-block">
+      <div class="name" id="vent-detail-name">--</div>
+      <div class="sub" id="vent-detail-bed">--</div>
+    </div>
+    <div class="toolbar-group">
+      <button class="filter-btn" onclick="toggleFieldPanel('vent-patient-field-panel')">自定义字段</button>
+      <button class="back-btn" onclick="switchTab('vent-central')">← 返回通气大屏</button>
+    </div>
+  </div>
+  <div class="field-panel" id="vent-patient-field-panel"></div>
+  <div class="detail-layout">
+    <div class="vitals-panel" id="vent-big-panel"></div>
+    <div class="ecg-panel">
+      <div class="panel-title">〰 呼吸波（实时）</div>
+      <canvas id="ventWaveCanvas"></canvas>
+    </div>
+  </div>
+</div>
+
+<div id="module-waveform" class="module">
+  <div class="review-toolbar" style="flex-wrap:wrap;">
+    <label>开始</label><input type="datetime-local" id="wave-start" value="2026-06-24T00:00">
+    <label>结束</label><input type="datetime-local" id="wave-end" value="2026-06-24T00:10">
+    <div class="toolbar-group">
+      <span class="toolbar-label">走速</span>
+      <button class="filter-btn active" onclick="setWaveSpeed(25, this)">25 mm/s</button>
+      <button class="filter-btn" onclick="setWaveSpeed(12.5, this)">12.5</button>
+      <button class="filter-btn" onclick="setWaveSpeed(50, this)">50</button>
+    </div>
+    <div class="toolbar-group">
+      <span class="toolbar-label">增益</span>
+      <button class="filter-btn" onclick="setWaveGain(5, this)">5</button>
+      <button class="filter-btn active" onclick="setWaveGain(10, this)">10</button>
+      <button class="filter-btn" onclick="setWaveGain(20, this)">20</button>
+    </div>
+    <div class="toolbar-group" id="wave-channels"></div>
+    <button class="filter-btn active" id="wave-play-btn" onclick="toggleWavePlay()">播放</button>
+  </div>
+  <div class="trend-panel">
+    <canvas id="waveformCanvas" style="height:300px;"></canvas>
+  </div>
+</div>
+
+<div id="module-report" class="module">
+  <div class="review-toolbar" style="flex-wrap:wrap;">
+    <label>患者</label>
+    <select id="report-patient"></select>
+    <label>时间段</label>
+    <select id="report-range" onchange="toggleReportTimeInputs()">
+      <option value="24h">24小时报告</option>
+      <option value="custom">自定义时间段</option>
+    </select>
+    <input type="datetime-local" id="report-start" style="display:none;">
+    <input type="datetime-local" id="report-end" style="display:none;">
+    <button class="filter-btn active" onclick="generateReport()">生成报告</button>
+  </div>
+  <div class="card report-view" id="report-view" style="display:none;">
+    <div class="panel-title" id="report-title"></div>
+    <div class="report-section"><button class="section-toggle" onclick="toggleSection(this)">1. 血流动力学</button><div class="section-body"><div id="report-hemo"></div><canvas id="bpCanvas" height="120"></canvas></div></div>
+    <div class="report-section"><button class="section-toggle" onclick="toggleSection(this)">2. 心率分析</button><div class="section-body"><div id="report-hr"></div><canvas id="hrCanvas" height="120"></canvas></div></div>
+    <div class="report-section"><button class="section-toggle" onclick="toggleSection(this)">3. 呼吸与血氧分析</button><div class="section-body"><div id="report-resp"></div></div></div>
+    <div class="report-section"><button class="section-toggle" onclick="toggleSection(this)">4. 事件统计</button><div class="section-body"><div id="report-event"></div><canvas id="eventDistCanvas" height="120"></canvas></div></div>
+    <div class="toolbar-group" style="margin-top:12px;">
+      <button class="filter-btn">📋 在页面查看</button>
+      <button class="filter-btn" onclick="simulateDownload('已生成报告 PDF，正在下载...')">⬇ 下载报告（模拟）</button>
+      <button class="filter-btn" onclick="window.print()">🖨 打印报告</button>
+    </div>
+  </div>
+</div>
+
+<div class="alarm-overlay" id="alarm-overlay" style="display:none;">
+  <div class="alarm-modal">
+    <div class="alarm-modal-title" id="alarm-modal-title">⚠ 危急报警</div>
+    <div class="alarm-modal-body" id="alarm-modal-body"></div>
+    <div class="alarm-modal-actions">
+      <button class="filter-btn alarm-confirm" onclick="confirmAlarm()">确认报警</button>
+      <button class="filter-btn" onclick="viewAlarmDetail()">查看详情</button>
+    </div>
+  </div>
+</div>
+<div class="alarm-overlay" id="event-report-overlay" style="display:none;">
+  <div class="alarm-modal" style="width:700px;">
+    <div class="alarm-modal-title">📄 事件报告</div>
+    <div class="alarm-modal-body" id="event-report-body"></div>
+    <div class="alarm-modal-actions">
+      <button class="filter-btn" onclick="window.print()">🖨 打印</button>
+      <button class="filter-btn" onclick="simulateDownload('事件报告下载中...')">⬇ 下载（模拟）</button>
+      <button class="filter-btn alarm-confirm" onclick="closeEventReport()">✕ 关闭</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
 
 <script>
 /* ===== 患者数据模型 ===== */
@@ -1745,6 +1909,540 @@ window.addEventListener('resize', () => {
       canvas.width = canvas.parentElement.clientWidth - 32;
     }
   }
+});
+
+/* ===== 增强功能补充 ===== */
+let deptGridCols = 4;
+let ventGridCols = 4;
+let trendTableMode = 'hour';
+let selectedTrendSeconds = [];
+let selectedTrendMeta = null;
+let ventSelectedPatient = 0;
+const deptVisibleFields = { hr: true, spo2: true, nibp: true, rr: true, temp: true };
+const patientVisibleFields = { hr: true, spo2: true, nibp: true, rr: true, temp: true };
+const ventCentralFields = { vt: true, peep: true, fio2: true, ppeak: true, rr: true };
+const ventPatientFields = { vt: true, peep: true, fio2: true, ppeak: true, rr: true };
+const alarmQueue = [];
+let activeAlarm = null;
+const alarmCooldown = {};
+const VENT_DATA = PATIENTS.map((p, i) => ({
+  bed: p.bed, name: p.name, patientIndex: i,
+  vt: 450 + Math.round(Math.random() * 60),
+  peep: 5 + Math.round(Math.random() * 4),
+  fio2: 40 + Math.round(Math.random() * 20),
+  ppeak: 22 + Math.round(Math.random() * 8),
+  rr: 14 + Math.round(Math.random() * 6)
+}));
+let wavePlaying = true;
+let waveSpeed = 25;
+let waveGain = 10;
+let wavePhase = 0;
+const waveChannels = { ECG: true, RESP: true, SPO2: false };
+let waveAnim = null;
+let ventWaveAnim = null;
+
+function toggleFieldPanel(id) {
+  const panel = document.getElementById(id);
+  if (panel) panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+}
+
+function buildFieldPanel(id, state, options, onChange) {
+  const panel = document.getElementById(id);
+  if (!panel) return;
+  panel.innerHTML = options.map(o => `<label><input type="checkbox" ${state[o.key] ? 'checked' : ''} onchange="${onChange}('${o.key}', this.checked)"> ${o.label}</label>`).join('');
+}
+
+function setDeptField(key, checked) { deptVisibleFields[key] = checked; renderBedGrid(); }
+function setPatientField(key, checked) {
+  patientVisibleFields[key] = checked;
+  const row = document.getElementById(`bv-${key}`);
+  if (row && row.closest('.big-vital')) row.closest('.big-vital').style.display = checked ? 'flex' : 'none';
+}
+function setVentCentralField(key, checked) { ventCentralFields[key] = checked; renderVentCentralGrid(); }
+function setVentPatientField(key, checked) { ventPatientFields[key] = checked; renderVentPatientPanel(); }
+
+function setDeptGridCols(cols, btn) {
+  deptGridCols = cols;
+  const grid = document.getElementById('bed-grid');
+  if (grid) grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  if (btn) { btn.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }
+}
+function setVentGridCols(cols, btn) {
+  ventGridCols = cols;
+  const grid = document.getElementById('vent-central-grid');
+  if (grid) grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  if (btn) { btn.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  const module = document.getElementById('module-' + name);
+  if (module) module.classList.add('active');
+  const tab = [...document.querySelectorAll('.nav-tab')].find(t => (t.getAttribute('onclick') || '').includes(`'${name}'`));
+  if (tab) tab.classList.add('active');
+
+  if (name === 'review') setTimeout(() => drawTrendChart(document.getElementById('time-start').value, document.getElementById('time-end').value), 80);
+  if (name === 'patient') setTimeout(() => { if (selectedPatient === null) selectedPatient = 0; startEcg(); updateDetailPanel(); }, 80);
+  if (name === 'vent-central') setTimeout(() => renderVentCentralGrid(), 50);
+  if (name === 'vent-patient') setTimeout(() => { renderVentPatientPanel(); startVentWave(); }, 80);
+  if (name === 'waveform') setTimeout(() => drawWaveform(), 50);
+}
+
+function renderBedGrid() {
+  const grid = document.getElementById('bed-grid');
+  if (!grid) return;
+  grid.style.gridTemplateColumns = `repeat(${deptGridCols}, 1fr)`;
+  const defs = [
+    { key: 'hr', label: 'HR', unit: 'bpm', value: p => fmt(p.hr), classKey: 'hr' },
+    { key: 'spo2', label: 'SpO₂', unit: '%', value: p => fmt(p.spo2), classKey: 'spo2' },
+    { key: 'nibp', label: 'NIBP', unit: 'mmHg', value: p => `${fmt(p.sbp)}/${fmt(p.dbp)}`, classKey: 'nibp', style: 'font-size:13px' },
+    { key: 'rr', label: 'RR', unit: '次/分', value: p => fmt(p.rr), classKey: 'rr' },
+    { key: 'temp', label: 'Temp', unit: '°C', value: p => fmt(p.temp, 1), classKey: 'temp' }
+  ].filter(d => deptVisibleFields[d.key]);
+  grid.innerHTML = '';
+  PATIENTS.forEach((p, i) => {
+    const card = document.createElement('div');
+    card.className = `bed-card status-${p.status}`;
+    card.onclick = () => openPatient(i);
+    card.innerHTML = `
+      <div class="bed-card-header">
+        <div>
+          <div class="bed-no">${p.bed}</div>
+          <div class="bed-patient">${p.name}</div>
+          <div class="bed-patient-sub">${p.age}岁 · ${p.gender} · ${p.diag}</div>
+        </div>
+        <span class="status-badge ${p.status === 'ok' ? 'ok' : p.status === 'warn' ? 'warn' : 'danger'}">${p.status === 'ok' ? '正常' : p.status === 'warn' ? '警告' : '危急'}</span>
+      </div>
+      <div class="vitals-grid">
+        ${defs.map(d => `<div class="vital-item"><span class="vital-label">${d.label}</span><span class="vital-value ${getVitalClass(p, d.classKey)}" style="${d.style || ''}">${d.value(p)}</span><span class="vital-unit">${d.unit}</span></div>`).join('')}
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function updateDetailPanel() {
+  if (selectedPatient === null) return;
+  const p = PATIENTS[selectedPatient];
+  document.getElementById('detail-name').textContent = p.name;
+  document.getElementById('detail-diag').textContent = `诊断：${p.diag}`;
+  document.getElementById('detail-bed').textContent = p.bed;
+  document.getElementById('detail-age').textContent = `${p.age}岁 / ${p.gender}`;
+  document.getElementById('detail-admit').textContent = p.admit;
+  document.getElementById('detail-status').textContent = p.status === 'ok' ? '✅ 正常' : p.status === 'warn' ? '⚠️ 警告' : '🆘 危急';
+  document.getElementById('bv-hr').textContent = fmt(p.hr);
+  document.getElementById('bv-spo2').textContent = fmt(p.spo2);
+  document.getElementById('bv-nibp').textContent = `${fmt(p.sbp)}/${fmt(p.dbp)}`;
+  document.getElementById('bv-rr').textContent = fmt(p.rr);
+  document.getElementById('bv-temp').textContent = fmt(p.temp, 1);
+  document.getElementById('ecg-hr-label').textContent = fmt(p.hr);
+  Object.keys(patientVisibleFields).forEach(k => setPatientField(k, patientVisibleFields[k]));
+}
+
+function enqueueAlarm(alarm) {
+  alarmQueue.push(alarm);
+  if (!activeAlarm) showNextAlarm();
+}
+function showNextAlarm() {
+  if (!alarmQueue.length) {
+    activeAlarm = null;
+    document.getElementById('alarm-overlay').style.display = 'none';
+    return;
+  }
+  activeAlarm = alarmQueue[0];
+  document.getElementById('alarm-overlay').style.display = 'flex';
+  document.getElementById('alarm-modal-title').textContent = `${activeAlarm.withBell ? '🔔 ' : ''}⚠ 危急报警`;
+  document.getElementById('alarm-modal-body').innerHTML = `
+    <div>床号：${activeAlarm.bed}</div>
+    <div>患者：${activeAlarm.patient}</div>
+    <div>报警参数：${activeAlarm.type}</div>
+    <div>当前值：${activeAlarm.value}</div>
+    <div>阈值：${activeAlarm.threshold}</div>
+  `;
+}
+function confirmAlarm() { alarmQueue.shift(); showNextAlarm(); }
+function viewAlarmDetail() {
+  if (!activeAlarm) return;
+  confirmAlarm();
+  if (activeAlarm.vent) { ventSelectedPatient = activeAlarm.index; switchTab('vent-patient'); }
+  else { openPatient(activeAlarm.index); }
+}
+
+function maybeTriggerAlarm(source, i, type, value, threshold, withBell, vent = false) {
+  const key = `${source}-${i}-${type}`;
+  const now = Date.now();
+  if (alarmCooldown[key] && now - alarmCooldown[key] < 30000) return;
+  alarmCooldown[key] = now;
+  const p = PATIENTS[i];
+  enqueueAlarm({ bed: p.bed, patient: p.name, type, value, threshold, index: i, withBell, vent });
+}
+
+function updateVitals() {
+  PATIENTS.forEach((p, i) => {
+    const isDanger = p.status === 'danger';
+    const isWarn = p.status === 'warn';
+    if (isDanger) {
+      p.hr = Math.max(120, Math.min(160, jitter(p.hr, 4))); p.spo2 = Math.max(82, Math.min(90, jitter(p.spo2, 1)));
+      p.sbp = Math.max(70, Math.min(95, jitter(p.sbp, 3))); p.dbp = Math.max(40, Math.min(60, jitter(p.dbp, 2)));
+      p.rr = Math.max(26, Math.min(36, jitter(p.rr, 2))); p.temp = Math.max(38.8, Math.min(40.5, jitter(p.temp, 0.1)));
+    } else if (isWarn) {
+      p.hr = Math.max(95, Math.min(120, jitter(p.hr, 3))); p.spo2 = Math.max(91, Math.min(95, jitter(p.spo2, 0.5)));
+      p.sbp = Math.max(140, Math.min(165, jitter(p.sbp, 3))); p.dbp = Math.max(88, Math.min(105, jitter(p.dbp, 2)));
+      p.rr = Math.max(20, Math.min(26, jitter(p.rr, 1))); p.temp = Math.max(37.0, Math.min(38.2, jitter(p.temp, 0.05)));
+    } else {
+      p.hr = Math.max(55, Math.min(95, jitter(p.hr, 2))); p.spo2 = Math.max(95, Math.min(100, jitter(p.spo2, 0.5)));
+      p.sbp = Math.max(100, Math.min(140, jitter(p.sbp, 2))); p.dbp = Math.max(60, Math.min(90, jitter(p.dbp, 2)));
+      p.rr = Math.max(12, Math.min(22, jitter(p.rr, 1))); p.temp = Math.max(36.0, Math.min(37.8, jitter(p.temp, 0.05)));
+    }
+    if (p.hr > 140) maybeTriggerAlarm('dept', i, 'HR', `${fmt(p.hr)} bpm`, '> 140 bpm', selectedPatient === i && document.getElementById('module-patient').classList.contains('active'));
+    if (p.spo2 < 88) maybeTriggerAlarm('dept', i, 'SpO₂', `${fmt(p.spo2)} %`, '< 88%', selectedPatient === i && document.getElementById('module-patient').classList.contains('active'));
+    if (p.rr > 32) maybeTriggerAlarm('dept', i, 'RR', `${fmt(p.rr)} 次/分`, '> 32 次/分', selectedPatient === i && document.getElementById('module-patient').classList.contains('active'));
+  });
+  renderBedGrid();
+  if (selectedPatient !== null) updateDetailPanel();
+}
+
+function renderVentCentralGrid() {
+  const grid = document.getElementById('vent-central-grid');
+  if (!grid) return;
+  grid.style.gridTemplateColumns = `repeat(${ventGridCols}, 1fr)`;
+  const defs = [
+    { key: 'vt', label: 'VT', unit: 'mL' },
+    { key: 'peep', label: 'PEEP', unit: 'cmH₂O' },
+    { key: 'fio2', label: 'FiO₂', unit: '%' },
+    { key: 'ppeak', label: 'Ppeak', unit: 'cmH₂O' },
+    { key: 'rr', label: 'RR', unit: '次/分' }
+  ].filter(d => ventCentralFields[d.key]);
+  grid.innerHTML = VENT_DATA.map((v, i) => `
+    <div class="bed-card ${v.ppeak > 35 ? 'status-danger' : 'status-ok'}" onclick="openVentPatient(${i})">
+      <div class="bed-card-header"><div><div class="bed-no">${v.bed}</div><div class="bed-patient">${v.name}</div></div><span class="status-badge ${v.ppeak > 35 ? 'danger' : 'ok'}">${v.ppeak > 35 ? '危急' : '稳定'}</span></div>
+      <div class="vitals-grid">${defs.map(d => `<div class="vital-item"><span class="vital-label">${d.label}</span><span class="vital-value ${d.key === 'ppeak' && v.ppeak > 35 ? 'danger' : ''}">${fmt(v[d.key])}</span><span class="vital-unit">${d.unit}</span></div>`).join('')}</div>
+    </div>
+  `).join('');
+}
+
+function openVentPatient(index) { ventSelectedPatient = index; switchTab('vent-patient'); }
+function renderVentPatientPanel() {
+  const v = VENT_DATA[ventSelectedPatient];
+  if (!v) return;
+  document.getElementById('vent-detail-name').textContent = v.name;
+  document.getElementById('vent-detail-bed').textContent = `${v.bed} · 机械通气监护`;
+  const defs = [
+    { key: 'vt', label: '潮气量 VT', unit: 'mL' },
+    { key: 'peep', label: 'PEEP', unit: 'cmH₂O' },
+    { key: 'fio2', label: 'FiO₂', unit: '%' },
+    { key: 'ppeak', label: 'Ppeak', unit: 'cmH₂O' },
+    { key: 'rr', label: 'RR', unit: '次/分' }
+  ].filter(d => ventPatientFields[d.key]);
+  document.getElementById('vent-big-panel').innerHTML = `<div class="panel-title">📊 通气参数</div>${defs.map(d => `<div class="big-vital"><span class="bv-label">${d.label}</span><span class="bv-value ${d.key === 'ppeak' && v.ppeak > 35 ? 'danger' : ''}">${fmt(v[d.key])}</span><span class="bv-unit">${d.unit}</span></div>`).join('')}`;
+}
+
+function startVentWave() {
+  cancelAnimationFrame(ventWaveAnim);
+  const canvas = document.getElementById('ventWaveCanvas');
+  if (!canvas) return;
+  canvas.width = canvas.parentElement.clientWidth - 32; canvas.height = 220;
+  const ctx = canvas.getContext('2d');
+  let t = 0;
+  const draw = () => {
+    const rr = VENT_DATA[ventSelectedPatient]?.rr || 16;
+    const freq = rr / 60;
+    t += 0.03;
+    ctx.fillStyle = '#050a14'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = 'rgba(0,212,255,0.07)'; for (let i = 0; i <= 20; i++) { ctx.beginPath(); ctx.moveTo(i * canvas.width / 20, 0); ctx.lineTo(i * canvas.width / 20, canvas.height); ctx.stroke(); }
+    ctx.strokeStyle = '#00ff88'; ctx.lineWidth = 2; ctx.beginPath();
+    for (let x = 0; x < canvas.width; x++) {
+      const y = canvas.height / 2 + Math.sin((x / 60) + t * freq * 8) * 44;
+      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ventWaveAnim = requestAnimationFrame(draw);
+  };
+  draw();
+}
+
+function updateVentData() {
+  VENT_DATA.forEach((v, i) => {
+    v.vt = Math.max(350, Math.min(650, jitter(v.vt, 12)));
+    v.peep = Math.max(4, Math.min(16, jitter(v.peep, 0.6)));
+    v.fio2 = Math.max(30, Math.min(100, jitter(v.fio2, 2)));
+    v.ppeak = Math.max(16, Math.min(42, jitter(v.ppeak, 1.4)));
+    v.rr = Math.max(10, Math.min(30, jitter(v.rr, 1)));
+    if (Math.random() < 0.03) v.ppeak = 36 + Math.random() * 5;
+    if (v.ppeak > 35) maybeTriggerAlarm('vent', i, 'Ppeak', `${fmt(v.ppeak)} cmH₂O`, '> 35 cmH₂O', document.getElementById('module-vent-patient').classList.contains('active') && ventSelectedPatient === i, true);
+  });
+  if (document.getElementById('module-vent-central').classList.contains('active')) renderVentCentralGrid();
+  if (document.getElementById('module-vent-patient').classList.contains('active')) renderVentPatientPanel();
+}
+
+function buildPreAlarmData(event) {
+  const arr = [];
+  const alarmTime = new Date(`${event.date}T${event.time}:00`);
+  const baseHr = event.desc.includes('HR') ? 130 : 90;
+  const baseSpo2 = event.desc.includes('SpO₂') ? 89 : 96;
+  for (let i = 59; i >= 0; i--) {
+    const t = new Date(alarmTime.getTime() - i * 1000);
+    const hr = Math.round(baseHr + Math.sin(i / 8) * 6 + (Math.random() * 6 - 3));
+    const spo2 = Math.round(baseSpo2 + Math.cos(i / 10) * 2 + (Math.random() * 2 - 1));
+    arr.push({ time: t.toTimeString().slice(0, 8), hr, spo2, nibp: `${110 + Math.round(Math.random() * 18)}/${65 + Math.round(Math.random() * 14)}`, rr: 14 + Math.round(Math.random() * 12), temp: (36.5 + Math.random() * 2.2).toFixed(1), isAlarm: i === 0 });
+  }
+  return arr;
+}
+
+function showPreAlarmTrend(date, time) {
+  const event = EVENTS_DATA.find(e => e.type === 'alarm' && e.date === date && e.time === time);
+  if (!event) return;
+  selectedTrendSeconds = buildPreAlarmData(event);
+  selectedTrendMeta = event;
+  trendTableMode = 'second';
+  document.querySelectorAll('#module-review #trend-table-title + .toolbar-group .filter-btn').forEach((b, i) => b.classList.toggle('active', i === 1));
+  const tableTitle = document.getElementById('trend-table-title');
+  if (tableTitle) tableTitle.textContent = '📋 逐秒数据（报警前1分钟）';
+  drawTrendChart(null, null, selectedTrendSeconds, selectedTrendMeta);
+  renderTrendTable();
+}
+
+function drawTrendChart(start, end, secondData, eventMeta) {
+  if (!secondData) {
+    const title = document.getElementById('trend-title');
+    if (title) title.textContent = '📈 趋势图（HR / SpO₂）';
+    if (!start) start = '2026-06-01T00:00';
+    if (!end) end = '2026-06-07T23:59';
+    const startDay = start.slice(0, 10);
+    const endDay = end.slice(0, 10);
+    const dayMap = {};
+    TREND_DATA.forEach(d => {
+      if (d.date >= startDay && d.date <= endDay) {
+        if (!dayMap[d.date]) dayMap[d.date] = [];
+        dayMap[d.date].push(d);
+      }
+    });
+    const days = Object.keys(dayMap).sort();
+    const chartData = days.map(date => {
+      const recs = dayMap[date];
+      return { date, hr: Math.round(recs.reduce((s, r) => s + r.hr, 0) / recs.length), spo2: Math.round(recs.reduce((s, r) => s + r.spo2, 0) / recs.length) };
+    });
+    const canvas = document.getElementById('trendCanvas');
+    canvas.width = canvas.parentElement.clientWidth - 32; canvas.height = 260;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height, pad = { l: 48, r: 20, t: 20, b: 36 };
+    const cw = W - pad.l - pad.r, ch = H - pad.t - pad.b;
+    ctx.fillStyle = '#050a14'; ctx.fillRect(0, 0, W, H);
+    if (!chartData.length) return;
+    ctx.strokeStyle = 'rgba(30,45,74,0.7)';
+    for (let i = 0; i <= 6; i++) { const y = pad.t + ch * i / 6; ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + cw, y); ctx.stroke(); }
+    const xStep = chartData.length > 1 ? cw / (chartData.length - 1) : cw;
+    const xOffset = chartData.length === 1 ? cw / 2 : 0;
+    const hrY = v => pad.t + ch - ((v - 40) / 140) * ch;
+    const spo2Y = v => pad.t + ch - ((v - 70) / 35) * ch;
+    ALARM_EVENTS_POINTS.forEach(dh => {
+      const idx = days.indexOf(dh.slice(0, 10));
+      if (idx < 0) return;
+      const x = pad.l + xOffset + idx * xStep;
+      ctx.strokeStyle = 'rgba(255,59,59,0.6)';
+      ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + ch); ctx.stroke(); ctx.setLineDash([]);
+    });
+    ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 2; ctx.beginPath();
+    chartData.forEach((d, i) => { const x = pad.l + xOffset + i * xStep; const y = hrY(d.hr); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+    ctx.strokeStyle = '#00ff88'; ctx.beginPath();
+    chartData.forEach((d, i) => { const x = pad.l + xOffset + i * xStep; const y = spo2Y(d.spo2); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+    return;
+  }
+  const title = document.getElementById('trend-title');
+  if (title) title.textContent = `📈 报警前1分钟趋势（${eventMeta.desc} @ ${eventMeta.date} ${eventMeta.time}）`;
+  const canvas = document.getElementById('trendCanvas');
+  canvas.width = canvas.parentElement.clientWidth - 32; canvas.height = 260;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height, pad = { l: 48, r: 20, t: 20, b: 36 };
+  const cw = W - pad.l - pad.r, ch = H - pad.t - pad.b;
+  ctx.fillStyle = '#050a14'; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(30,45,74,0.7)'; for (let i = 0; i <= 6; i++) { const y = pad.t + ch * i / 6; ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + cw, y); ctx.stroke(); }
+  const xStep = cw / (secondData.length - 1);
+  const hrY = v => pad.t + ch - ((v - 40) / 140) * ch;
+  const spo2Y = v => pad.t + ch - ((v - 70) / 35) * ch;
+  ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 2; ctx.beginPath(); secondData.forEach((d, i) => { const x = pad.l + i * xStep; const y = hrY(d.hr); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+  ctx.strokeStyle = '#00ff88'; ctx.beginPath(); secondData.forEach((d, i) => { const x = pad.l + i * xStep; const y = spo2Y(d.spo2); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+  const alarmX = pad.l + (secondData.length - 1) * xStep;
+  ctx.strokeStyle = 'rgba(255,59,59,0.8)'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(alarmX, pad.t); ctx.lineTo(alarmX, pad.t + ch); ctx.stroke(); ctx.setLineDash([]);
+}
+
+function setTrendTableMode(mode, btn) {
+  trendTableMode = mode;
+  if (btn) { btn.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }
+  const title = document.getElementById('trend-table-title');
+  if (title) title.textContent = mode === 'hour' ? '📋 逐小时数据' : '📋 逐秒数据（报警前1分钟）';
+  renderTrendTable(document.getElementById('time-start').value, document.getElementById('time-end').value);
+  if (mode === 'hour') drawTrendChart(document.getElementById('time-start').value, document.getElementById('time-end').value);
+}
+
+function renderTrendTable(start, end) {
+  const tbody = document.getElementById('trend-tbody');
+  if (!tbody) return;
+  if (trendTableMode === 'second') {
+    const data = selectedTrendSeconds.length ? selectedTrendSeconds : buildPreAlarmData(EVENTS_DATA.find(e => e.type === 'alarm'));
+    tbody.innerHTML = data.map(d => {
+      const abnormal = d.hr > 120 || d.hr < 50 || d.spo2 < 90;
+      return `<tr class="${abnormal ? 'abnormal' : ''}"><td style="font-family:monospace">${d.time}</td><td>${d.hr}</td><td>${d.spo2}%</td><td>${d.nibp}</td><td>${d.rr}</td><td>${d.temp}°C</td></tr>`;
+    }).join('');
+    return;
+  }
+  if (!start) start = '2026-06-01T00:00';
+  if (!end) end = '2026-06-07T23:59';
+  const startKey = start.replace('T', ' ').slice(0, 13) + ':00';
+  const endKey = end.replace('T', ' ').slice(0, 13) + ':59';
+  const filtered = TREND_DATA.filter(d => d.dateHour >= startKey && d.dateHour <= endKey);
+  tbody.innerHTML = filtered.map(d => {
+    const abnormal = d.hr > 120 || d.hr < 50 || d.spo2 < 90 || d.rr > 30 || Number(d.temp) > 38.5;
+    return `<tr class="${abnormal ? 'abnormal' : ''}"><td style="font-family:monospace;white-space:nowrap">${d.dateHour}</td><td>${d.hr}</td><td>${d.spo2}%</td><td>${d.sbp}/${d.dbp}</td><td>${d.rr}</td><td>${d.temp}°C</td></tr>`;
+  }).join('');
+}
+
+function renderEvents(filter, start, end) {
+  const list = document.getElementById('event-list');
+  let filtered = filter === 'all' ? EVENTS_DATA : EVENTS_DATA.filter(e => e.type === filter);
+  if (start) filtered = filtered.filter(e => e.date >= start.slice(0, 10));
+  if (end) filtered = filtered.filter(e => e.date <= end.slice(0, 10));
+  list.innerHTML = filtered.map(e => `
+    <div class="event-item">
+      <span class="ev-time">${e.date} ${e.time}</span>
+      <span class="ev-type ${e.type}-type">${e.type === 'alarm' ? '报警' : e.type === 'op' ? '操作' : '医嘱'}</span>
+      <span class="ev-desc">${e.desc}</span>
+      ${e.type === 'alarm' ? `<button class="filter-btn" style="padding:2px 8px;" onclick="showPreAlarmTrend('${e.date}','${e.time}')">查看前1分钟</button>` : ''}
+    </div>
+  `).join('');
+}
+
+function renderAlarmTable() {
+  const tbody = document.getElementById('alarm-tbody');
+  tbody.innerHTML = ALARMS_DATA.map(a => `
+    <tr class="${a.handled ? '' : 'unhandled'}" id="alarm-row-${a.id}">
+      <td style="font-family:monospace">${a.time}</td><td>${a.bed}</td><td>${a.patient}</td><td>${a.type}</td>
+      <td><span class="level-badge ${a.level === 'critical' ? 'critical' : a.level === 'warning' ? 'warning' : 'info'}">${a.level === 'critical' ? '危急' : a.level === 'warning' ? '警告' : '提示'}</span></td>
+      <td><span class="status-dot ${a.handled ? 'handled' : 'unhandled'}"></span>${a.handled ? '已处理' : '未处理'}</td>
+      <td>
+        <button class="handle-btn" id="handle-btn-${a.id}" onclick="handleAlarm(${a.id})" ${a.handled ? 'disabled' : ''}>${a.handled ? '已处理' : '处理'}</button>
+        <button class="handle-btn" onclick="openEventReport(${a.id})">生成报告</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openEventReport(id) {
+  const a = ALARMS_DATA.find(x => x.id === id);
+  if (!a) return;
+  const rows = Array.from({ length: 5 }).map((_, i) => {
+    const minute = i - 2;
+    return `<tr><td>${minute >= 0 ? '+' + minute : minute} min</td><td>${80 + Math.round(Math.random() * 60)}</td><td>${84 + Math.round(Math.random() * 14)}%</td><td>${12 + Math.round(Math.random() * 18)}</td></tr>`;
+  }).join('');
+  document.getElementById('event-report-body').innerHTML = `
+    <div>时间：${a.time}　床位：${a.bed}　患者：${a.patient}</div>
+    <div>类型：${a.type}　级别：${a.level === 'critical' ? '危急' : a.level === 'warning' ? '警告' : '提示'}</div>
+    <table class="report-table"><thead><tr><th>相对时间</th><th>HR</th><th>SpO₂</th><th>RR</th></tr></thead><tbody>${rows}</tbody></table>
+    <div style="margin-top:8px;">处理记录：值班护士已通知医生，执行医嘱后指标回升。</div>
+  `;
+  document.getElementById('event-report-overlay').style.display = 'flex';
+}
+function closeEventReport() { document.getElementById('event-report-overlay').style.display = 'none'; }
+
+function setWaveSpeed(v, btn) { waveSpeed = v; btn.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }
+function setWaveGain(v, btn) { waveGain = v; btn.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }
+function toggleWaveChannel(ch, btn) { waveChannels[ch] = !waveChannels[ch]; btn.classList.toggle('active', waveChannels[ch]); }
+function toggleWavePlay() {
+  wavePlaying = !wavePlaying;
+  document.getElementById('wave-play-btn').textContent = wavePlaying ? '暂停' : '播放';
+  document.getElementById('wave-play-btn').classList.toggle('active', wavePlaying);
+}
+function drawWaveform() {
+  cancelAnimationFrame(waveAnim);
+  const canvas = document.getElementById('waveformCanvas');
+  if (!canvas) return;
+  canvas.width = canvas.parentElement.clientWidth - 32; canvas.height = 300;
+  const ctx = canvas.getContext('2d');
+  const draw = () => {
+    if (wavePlaying) wavePhase += waveSpeed / 1000;
+    ctx.fillStyle = '#050a14'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = 'rgba(0,212,255,0.08)'; for (let i = 0; i <= 30; i++) { ctx.beginPath(); ctx.moveTo(i * canvas.width / 30, 0); ctx.lineTo(i * canvas.width / 30, canvas.height); ctx.stroke(); }
+    const drawLine = (color, fn, offset) => {
+      ctx.strokeStyle = color; ctx.lineWidth = 1.8; ctx.beginPath();
+      for (let x = 0; x < canvas.width; x++) {
+        const t = (x / 40) + wavePhase;
+        const y = canvas.height / 2 + offset + fn(t) * waveGain * 1.2;
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    };
+    if (waveChannels.ECG) drawLine('#00d4ff', t => ecgTemplate(t * 0.3) * 6, -60);
+    if (waveChannels.RESP) drawLine('#00ff88', t => Math.sin(t * 0.6), 0);
+    if (waveChannels.SPO2) drawLine('#ffaa00', t => Math.sin(t * 1.2) * 0.8, 60);
+    waveAnim = requestAnimationFrame(draw);
+  };
+  draw();
+}
+
+function toggleReportTimeInputs() {
+  const custom = document.getElementById('report-range').value === 'custom';
+  document.getElementById('report-start').style.display = custom ? 'inline-block' : 'none';
+  document.getElementById('report-end').style.display = custom ? 'inline-block' : 'none';
+}
+function toggleSection(btn) {
+  const body = btn.nextElementSibling;
+  body.style.display = body.style.display === 'none' ? 'block' : 'none';
+}
+function drawMiniBars(canvasId, data, color) {
+  const c = document.getElementById(canvasId); if (!c) return;
+  c.width = c.clientWidth; const ctx = c.getContext('2d');
+  ctx.fillStyle = '#050a14'; ctx.fillRect(0, 0, c.width, c.height);
+  const max = Math.max(...data, 1), w = c.width / data.length;
+  data.forEach((v, i) => { const h = (v / max) * (c.height - 20); ctx.fillStyle = color; ctx.fillRect(i * w + 3, c.height - h - 8, w - 6, h); });
+}
+function generateReport() {
+  const idx = Number(document.getElementById('report-patient').value || 0);
+  const p = PATIENTS[idx];
+  const isCustom = document.getElementById('report-range').value === 'custom';
+  const rangeText = isCustom ? `${document.getElementById('report-start').value || '--'} ~ ${document.getElementById('report-end').value || '--'}` : '最近24小时';
+  document.getElementById('report-view').style.display = 'block';
+  document.getElementById('report-title').textContent = `📑 ${p.name} 监护报告（${rangeText}）`;
+  const hrList = Array.from({ length: 24 }).map(() => 60 + Math.round(Math.random() * 90));
+  const spo2List = Array.from({ length: 24 }).map(() => 86 + Math.round(Math.random() * 14));
+  const rrList = Array.from({ length: 24 }).map(() => 12 + Math.round(Math.random() * 20));
+  document.getElementById('report-hemo').innerHTML = `平均HR：${Math.round(hrList.reduce((a, b) => a + b, 0) / hrList.length)}，最高/最低HR：${Math.max(...hrList)}/${Math.min(...hrList)}，平均NIBP：${118 + Math.round(Math.random() * 12)}/${68 + Math.round(Math.random() * 10)}`;
+  document.getElementById('report-hr').innerHTML = `最长平稳期：${2 + Math.round(Math.random() * 4)}小时，报警次数：${5 + Math.round(Math.random() * 8)}`;
+  document.getElementById('report-resp').innerHTML = `平均SpO₂：${Math.round(spo2List.reduce((a, b) => a + b, 0) / spo2List.length)}%，最低SpO₂：${Math.min(...spo2List)}%，平均RR：${Math.round(rrList.reduce((a, b) => a + b, 0) / rrList.length)}，异常事件：${3 + Math.round(Math.random() * 5)}次`;
+  document.getElementById('report-event').innerHTML = `<table class="report-table"><tr><th>类型</th><th>次数</th></tr><tr><td>SpO₂危急</td><td>${2 + Math.round(Math.random() * 4)}</td></tr><tr><td>HR异常</td><td>${2 + Math.round(Math.random() * 5)}</td></tr><tr><td>呼吸异常</td><td>${1 + Math.round(Math.random() * 3)}</td></tr></table>`;
+  drawMiniBars('bpCanvas', Array.from({ length: 12 }).map(() => 80 + Math.round(Math.random() * 60)), '#00d4ff');
+  drawMiniBars('hrCanvas', hrList.slice(0, 12), '#00ff88');
+  drawMiniBars('eventDistCanvas', Array.from({ length: 12 }).map(() => Math.round(Math.random() * 9)), '#ffaa00');
+}
+
+function simulateDownload(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.style.display = 'block';
+  setTimeout(() => { toast.style.display = 'none'; }, 2000);
+}
+
+function initEnhancements() {
+  buildFieldPanel('dept-field-panel', deptVisibleFields, [{ key: 'hr', label: 'HR' }, { key: 'spo2', label: 'SpO₂' }, { key: 'nibp', label: 'NIBP' }, { key: 'rr', label: 'RR' }, { key: 'temp', label: 'Temp' }], 'setDeptField');
+  buildFieldPanel('patient-field-panel', patientVisibleFields, [{ key: 'hr', label: 'HR' }, { key: 'spo2', label: 'SpO₂' }, { key: 'nibp', label: 'NIBP' }, { key: 'rr', label: 'RR' }, { key: 'temp', label: 'Temp' }], 'setPatientField');
+  buildFieldPanel('vent-central-field-panel', ventCentralFields, [{ key: 'vt', label: 'VT' }, { key: 'peep', label: 'PEEP' }, { key: 'fio2', label: 'FiO₂' }, { key: 'ppeak', label: 'Ppeak' }, { key: 'rr', label: 'RR' }], 'setVentCentralField');
+  buildFieldPanel('vent-patient-field-panel', ventPatientFields, [{ key: 'vt', label: 'VT' }, { key: 'peep', label: 'PEEP' }, { key: 'fio2', label: 'FiO₂' }, { key: 'ppeak', label: 'Ppeak' }, { key: 'rr', label: 'RR' }], 'setVentPatientField');
+  const channelWrap = document.getElementById('wave-channels');
+  if (channelWrap) channelWrap.innerHTML = ['ECG', 'RESP', 'SPO2'].map(ch => `<button class="filter-btn ${waveChannels[ch] ? 'active' : ''}" onclick="toggleWaveChannel('${ch}', this)">${ch === 'RESP' ? '呼吸波' : ch}</button>`).join('');
+  const waveBtn = document.getElementById('wave-play-btn');
+  if (waveBtn) waveBtn.textContent = '暂停';
+  const select = document.getElementById('report-patient');
+  if (select) select.innerHTML = PATIENTS.map((p, i) => `<option value="${i}">${p.bed} ${p.name}</option>`).join('');
+  renderBedGrid();
+  renderVentCentralGrid();
+  renderVentPatientPanel();
+  setInterval(updateVentData, 2000);
+}
+
+window.addEventListener('load', initEnhancements);
+window.addEventListener('resize', () => {
+  if (document.getElementById('module-waveform').classList.contains('active')) drawWaveform();
+  if (document.getElementById('module-vent-patient').classList.contains('active')) startVentWave();
 });
 </script>
 </body>
