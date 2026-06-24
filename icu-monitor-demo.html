@@ -874,6 +874,113 @@ canvas#trendCanvas {
   #report-view, #report-view * { visibility:visible; }
   #report-view { position:absolute; left:0; top:0; width:100%; }
 }
+
+/* ===== 患者日志模块 ===== */
+.nursing-log-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.nlog-stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  text-align: center;
+}
+.nlog-stat-card:hover { border-color: var(--primary); background: var(--primary-dim); }
+.nlog-stat-card.nlog-critical { border-color: rgba(255,59,59,0.4); }
+.nlog-stat-card.nlog-critical:hover { border-color: var(--danger); background: var(--danger-dim); }
+.nlog-stat-num { font-size: 36px; font-weight: 700; color: var(--primary); line-height: 1.1; }
+.nlog-stat-card.nlog-critical .nlog-stat-num { color: var(--danger); }
+.nlog-stat-label { font-size: 13px; color: var(--text); margin-top: 4px; }
+.nlog-stat-hint { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+/* 智能分析区 */
+.nlog-analysis-item {
+  padding: 8px 12px;
+  border-left: 3px solid var(--primary);
+  background: var(--primary-dim);
+  border-radius: 0 6px 6px 0;
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.nlog-analysis-item.critical { border-left-color: var(--danger); background: var(--danger-dim); color: var(--danger); }
+.nlog-analysis-item.warning  { border-left-color: var(--warn);   background: var(--warn-dim); }
+.nlog-continuous-group {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: var(--card2);
+  border-radius: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+/* 日志时间轴 */
+.nlog-timeline {
+  position: relative;
+  padding-left: 20px;
+}
+.nlog-timeline::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+.nlog-entry {
+  position: relative;
+  margin-bottom: 12px;
+  display: flex;
+  gap: 12px;
+}
+.nlog-entry-dot {
+  position: absolute;
+  left: -16px;
+  top: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex-shrink: 0;
+  z-index: 1;
+}
+.nlog-entry-dot.alarm   { background: var(--warn); }
+.nlog-entry-dot.order   { background: var(--primary); }
+.nlog-entry-dot.op      { background: var(--ok); }
+.nlog-critical-entry .nlog-entry-dot { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+.nlog-entry-content {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  flex: 1;
+}
+.nlog-critical-entry .nlog-entry-content { border-color: rgba(255,59,59,0.45); }
+.nlog-entry-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+.nlog-entry-time { font-size: 12px; color: var(--text-dim); font-family: monospace; }
+.nlog-entry-desc { font-size: 13px; color: var(--text); line-height: 1.5; }
+.nlog-critical-badge { font-size: 11px; color: var(--danger); font-weight: 600; }
+
+/* 标签 */
+.nlog-tag {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.nlog-tag.order-tag    { background: var(--primary-dim); color: var(--primary); }
+.nlog-tag.alarm-tag    { background: var(--warn-dim);    color: var(--warn); }
+.nlog-tag.op-tag       { background: var(--ok-dim);      color: var(--ok); }
+.nlog-tag.critical-tag { background: var(--danger-dim);  color: var(--danger); }
 </style>
 </head>
 <body>
@@ -890,6 +997,7 @@ canvas#trendCanvas {
     <button class="nav-tab" data-tab="vent-patient" onclick="switchTab('vent-patient')">单患者通气</button>
     <button class="nav-tab" data-tab="waveform" onclick="switchTab('waveform')">波形回顾</button>
     <button class="nav-tab" data-tab="report" onclick="switchTab('report')">监护报告</button>
+    <button class="nav-tab" data-tab="nursing-log" onclick="switchTab('nursing-log')">患者日志</button>
   </div>
 </div>
 
@@ -1310,7 +1418,7 @@ function switchTab(name) {
   document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('module-' + name).classList.add('active');
-  const tabs = { dept: 0, patient: 1, review: 2, alarm: 3 };
+  const tabs = { dept: 0, patient: 1, review: 2, alarm: 3, 'nursing-log': 8 };
   document.querySelectorAll('.nav-tab')[tabs[name]].classList.add('active');
 
   if (name === 'review') {
@@ -1323,6 +1431,9 @@ function switchTab(name) {
   }
   if (name === 'patient') {
     setTimeout(() => { startEcg(); updateDetailPanel(); }, 100);
+  }
+  if (name === 'nursing-log') {
+    initNursingLog();
   }
 }
 
@@ -2644,7 +2755,247 @@ window.addEventListener('resize', () => {
   if (document.getElementById('module-waveform').classList.contains('active')) drawWaveform();
   if (document.getElementById('module-vent-patient').classList.contains('active')) startVentWave();
 });
+
+/* ===== 患者日志模块 ===== */
+let nlogCurrentData = [];
+let nlogCurrentSourceType = '';
+
+function initNursingLog() {
+  const select = document.getElementById('nlog-patient');
+  if (!select || select.options.length > 0) return;
+  PATIENTS.forEach((p, i) => {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = p.bed + ' ' + p.name;
+    select.appendChild(opt);
+  });
+}
+
+function generateNursingLog() {
+  initNursingLog();
+  const idx = Number(document.getElementById('nlog-patient').value || 0);
+  const p = PATIENTS[idx];
+  const startDate = document.getElementById('nlog-start').value || '2026-06-01';
+  const endDate   = document.getElementById('nlog-end').value   || '2026-07-12';
+
+  const filtered = EVENTS_DATA.filter(e => e.date >= startDate && e.date <= endDate);
+  nlogCurrentData = filtered;
+
+  const orders   = filtered.filter(e => e.type === 'order');
+  const alarms   = filtered.filter(e => e.type === 'alarm');
+  const ops      = filtered.filter(e => e.type === 'op');
+  const critical = filtered.filter(e => e.type === 'alarm' && (e.desc.includes('危急') || e.desc.includes('危急值')));
+
+  renderNlogStats(orders, alarms, ops, critical);
+  const analysis = analyzeNursingEvents(orders, alarms, ops, critical);
+  renderNlogAnalysis(analysis);
+  renderNlogTimeline(filtered);
+
+  document.getElementById('nlog-stats').style.display = 'grid';
+  document.getElementById('nlog-analysis-card').style.display = 'block';
+  document.getElementById('nlog-timeline-card').style.display = 'block';
+
+  // 危急值消息提醒
+  if (critical.length > 0) {
+    showToast('⚠ 发现 ' + critical.length + ' 条危急事件，请关注患者日志分析');
+  }
+}
+
+function renderNlogStats(orders, alarms, ops, critical) {
+  document.getElementById('nlog-stats').innerHTML = [
+    { num: orders.length,   icon: '📋', label: '医嘱总数',   type: 'order',    cls: '' },
+    { num: alarms.length,   icon: '🔔', label: '报警次数',   type: 'alarm',    cls: '' },
+    { num: ops.length,      icon: '🩺', label: '护理操作',   type: 'op',       cls: '' },
+    { num: critical.length, icon: '🚨', label: '危急事件',   type: 'critical', cls: ' nlog-critical' },
+  ].map(d => `
+    <div class="nlog-stat-card${d.cls}" onclick="showNlogSource('${d.type}')" title="点击查看数据来源">
+      <div class="nlog-stat-num">${d.num}</div>
+      <div class="nlog-stat-label">${d.icon} ${d.label}</div>
+      <div class="nlog-stat-hint">点击溯源 →</div>
+    </div>
+  `).join('');
+}
+
+function analyzeNursingEvents(orders, alarms, ops, critical) {
+  // 按类型分组报警，找持续性事件
+  const grouped = {};
+  alarms.forEach(e => {
+    let cat = '其他报警';
+    if      (e.desc.includes('SpO₂') || e.desc.includes('低氧')) cat = 'SpO₂异常';
+    else if (e.desc.includes('HR')   || e.desc.includes('心动')) cat = '心率异常';
+    else if (e.desc.includes('血压') || e.desc.includes('BP'))   cat = '血压异常';
+    else if (e.desc.includes('体温') || e.desc.includes('发热') || e.desc.includes('高热')) cat = '体温异常';
+    else if (e.desc.includes('RR')   || e.desc.includes('呼吸急')) cat = '呼吸异常';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(e);
+  });
+
+  const continuousGroups = Object.entries(grouped)
+    .filter(([, evs]) => evs.length > 1)
+    .map(([category, evs]) => ({ category, count: evs.length, events: evs }));
+
+  const medChanges = orders.filter(e =>
+    e.desc.includes('加量') || e.desc.includes('调整') ||
+    e.desc.includes('追加') || e.desc.includes('降级') || e.desc.includes('更改')
+  );
+
+  const findings = [];
+  continuousGroups.forEach(g => {
+    const first = g.events[0], last = g.events[g.events.length - 1];
+    findings.push({ text: `【持续性事件】${g.category} 共发生 ${g.count} 次，首次：${first.date} ${first.time}，末次：${last.date} ${last.time}`, level: 'warning', group: g });
+  });
+  if (medChanges.length > 0) {
+    findings.push({ text: `【医嘱调整】观察期内共有 ${medChanges.length} 次药物调整或医嘱变更`, level: 'info' });
+  }
+  if (critical.length > 0) {
+    findings.push({ text: `【危急值提醒】发现 ${critical.length} 次危急报警，请重点关注`, level: 'critical' });
+  }
+  if (ops.length > 0) {
+    findings.push({ text: `【护理操作】共完成 ${ops.length} 项护理操作记录`, level: 'info' });
+  }
+  if (findings.length === 0) {
+    findings.push({ text: '观察期内未发现异常事件，患者状态平稳', level: 'info' });
+  }
+
+  return { continuousGroups, medChanges, findings };
+}
+
+function renderNlogAnalysis(analysis) {
+  let html = analysis.findings.map(f => `
+    <div class="nlog-analysis-item ${f.level === 'critical' ? 'critical' : f.level === 'warning' ? 'warning' : ''}">${esc(f.text)}</div>
+  `).join('');
+
+  if (analysis.continuousGroups.length > 0) {
+    html += '<div style="margin-top:12px;font-size:12px;color:var(--text-dim);font-weight:600;margin-bottom:6px;">持续性事件汇总</div>';
+    analysis.continuousGroups.forEach(g => {
+      html += `<div class="nlog-continuous-group">
+        <span class="nlog-tag alarm-tag">持续 · ${esc(g.category)}</span>
+        <span style="color:var(--text-dim);margin-left:8px;font-size:12px;">发作 ${g.count} 次 &nbsp;|&nbsp; ${g.events[0].date} ${g.events[0].time} — ${g.events[g.events.length-1].date} ${g.events[g.events.length-1].time}</span>
+      </div>`;
+    });
+  }
+
+  document.getElementById('nlog-analysis-body').innerHTML = html;
+}
+
+function renderNlogTimeline(events) {
+  const el = document.getElementById('nlog-timeline-body');
+  if (events.length === 0) {
+    el.innerHTML = '<p style="color:var(--text-dim);padding:8px 0;">当前时间范围内无日志记录</p>';
+    return;
+  }
+  const sorted = [...events].sort((a, b) => (a.date + a.time < b.date + b.time ? -1 : 1));
+  el.innerHTML = sorted.map(e => {
+    const isCritical = e.type === 'alarm' && e.desc.includes('危急');
+    const tagCls   = e.type === 'alarm' ? (isCritical ? 'critical-tag' : 'alarm-tag')
+                   : e.type === 'order' ? 'order-tag' : 'op-tag';
+    const tagLabel = e.type === 'alarm' ? (isCritical ? '危急' : '报警')
+                   : e.type === 'order' ? '医嘱' : '护理';
+    return `
+      <div class="nlog-entry ${isCritical ? 'nlog-critical-entry' : ''}">
+        <div class="nlog-entry-dot ${e.type}"></div>
+        <div class="nlog-entry-content">
+          <div class="nlog-entry-header">
+            <span class="nlog-tag ${tagCls}">${tagLabel}</span>
+            <span class="nlog-entry-time">${e.date} ${e.time}</span>
+            ${isCritical ? '<span class="nlog-critical-badge">⚡ 危急值</span>' : ''}
+          </div>
+          <div class="nlog-entry-desc">${esc(e.desc)}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function showNlogSource(type) {
+  const labelMap = { order: '📋 医嘱数据来源', alarm: '🔔 报警记录来源', op: '🩺 护理操作来源', critical: '🚨 危急事件来源' };
+  let evs;
+  if      (type === 'order')    evs = nlogCurrentData.filter(e => e.type === 'order');
+  else if (type === 'alarm')    evs = nlogCurrentData.filter(e => e.type === 'alarm');
+  else if (type === 'op')       evs = nlogCurrentData.filter(e => e.type === 'op');
+  else                          evs = nlogCurrentData.filter(e => e.type === 'alarm' && e.desc.includes('危急'));
+
+  nlogCurrentSourceType = type;
+  document.getElementById('nlog-source-title').textContent = labelMap[type] || '数据来源明细';
+
+  const body = document.getElementById('nlog-source-body');
+  if (evs.length === 0) {
+    body.innerHTML = '<p style="color:var(--text-dim);padding:8px 0;">暂无相关记录</p>';
+  } else {
+    body.innerHTML = `
+      <p style="color:var(--text-dim);font-size:12px;margin-bottom:10px;">共 ${evs.length} 条原始记录（以下为数据来源及明细）</p>
+      <table class="data-table" style="width:100%;">
+        <thead><tr><th>序号</th><th>日期</th><th>时间</th><th>事件描述</th></tr></thead>
+        <tbody>${evs.map((e, i) => `
+          <tr class="${e.desc.includes('危急') ? 'abnormal' : ''}">
+            <td style="color:var(--text-dim)">${i + 1}</td>
+            <td style="white-space:nowrap">${e.date}</td>
+            <td style="white-space:nowrap;font-family:monospace">${e.time}</td>
+            <td>${esc(e.desc)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+  document.getElementById('nlog-source-overlay').style.display = 'flex';
+}
+
+function closeNlogSource() {
+  document.getElementById('nlog-source-overlay').style.display = 'none';
+}
+
+function exportNlogSource() {
+  simulateDownload('数据明细导出中，文件即将下载...');
+}
+
+function exportNursingLog() {
+  simulateDownload('患者日志导出中，文件即将下载...');
+}
 </script>
+<!-- ===== 模块：患者日志 ===== -->
+<div id="module-nursing-log" class="module">
+  <div class="module-toolbar">
+    <div class="toolbar-group">
+      <label>患者</label>
+      <select id="nlog-patient"></select>
+      <label>开始日期</label>
+      <input type="date" id="nlog-start" value="2026-06-01" style="background:var(--card2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;">
+      <label>至</label>
+      <input type="date" id="nlog-end" value="2026-07-12" style="background:var(--card2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;">
+      <button class="filter-btn active" onclick="generateNursingLog()">📋 生成日志</button>
+    </div>
+    <div class="toolbar-group">
+      <button class="filter-btn" onclick="exportNursingLog()">⬇ 导出日志</button>
+      <button class="filter-btn" onclick="window.print()">🖨 打印</button>
+    </div>
+  </div>
+
+  <!-- 统计卡片（点击可溯源） -->
+  <div class="nursing-log-stats" id="nlog-stats" style="display:none;"></div>
+
+  <!-- 智能分析 -->
+  <div class="card" id="nlog-analysis-card" style="display:none;margin-bottom:16px;">
+    <div class="panel-title">🤖 智能分析</div>
+    <div id="nlog-analysis-body" style="padding-top:8px;"></div>
+  </div>
+
+  <!-- 日志时间轴 -->
+  <div class="card" id="nlog-timeline-card" style="display:none;">
+    <div class="panel-title" style="margin-bottom:12px;">📜 护理日志时间轴</div>
+    <div class="nlog-timeline" id="nlog-timeline-body"></div>
+  </div>
+</div>
+
+<!-- 溯源详情弹窗 -->
+<div class="alarm-overlay" id="nlog-source-overlay" style="display:none;" onclick="if(event.target===this)closeNlogSource()">
+  <div class="alarm-modal" style="width:680px;max-height:80vh;display:flex;flex-direction:column;">
+    <div class="alarm-modal-title" id="nlog-source-title">数据来源明细</div>
+    <div class="alarm-modal-body" id="nlog-source-body" style="overflow-y:auto;flex:1;"></div>
+    <div class="alarm-modal-actions">
+      <button class="filter-btn" onclick="exportNlogSource()">⬇ 导出明细</button>
+      <button class="filter-btn alarm-confirm" onclick="closeNlogSource()">✕ 关闭</button>
+    </div>
+  </div>
+</div>
+
 <!-- 非阻断式报警通知容器 -->
 <div class="alarm-toaster" id="alarm-toaster"></div>
 </body>
