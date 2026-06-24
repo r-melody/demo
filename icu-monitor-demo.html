@@ -1496,10 +1496,10 @@ const ECG_LEADS = [
   { id: 'V6',  P:  0.07, Q: -0.03, R:  0.80, S: -0.08, T:  0.16 },
 ];
 
-// 每个导联独立数据缓冲和相位
+// 每个导联独立数据缓冲；相位统一为0，确保各导联心跳同步
 const ecgLeadState = {};
 ECG_LEADS.forEach(lead => {
-  ecgLeadState[lead.id] = { data: new Array(ECG_POINTS).fill(0), phase: Math.random() };
+  ecgLeadState[lead.id] = { data: new Array(ECG_POINTS).fill(0), phase: 0 };
 });
 
 function ecgLeadTemplate(t, lead) {
@@ -1512,8 +1512,10 @@ function ecgLeadTemplate(t, lead) {
   return v;
 }
 
-// 向后兼容：ecgTemplate 指向 Lead II 形态
+// 向后兼容：ecgTemplate 指向 Lead II（标准节律监护导联）
 function ecgTemplate(t) { return ecgLeadTemplate(t, ECG_LEADS[1]); }
+
+const ECG_NOISE_AMPLITUDE = 0.015; // 基线噪声幅度（mV相对单位）
 
 function startEcg() {
   if (ecgAnim) cancelAnimationFrame(ecgAnim);
@@ -1548,7 +1550,7 @@ function startEcg() {
       // 推进数据
       for (let s = 0; s < speed; s++) {
         state.phase += 1 / cycleLen;
-        const noise = (Math.random() - 0.5) * 0.015;
+        const noise = (Math.random() - 0.5) * ECG_NOISE_AMPLITUDE;
         state.data.shift();
         state.data.push(ecgLeadTemplate(state.phase, lead) + noise);
       }
