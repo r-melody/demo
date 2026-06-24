@@ -1946,10 +1946,19 @@ const SPO2_LOW_THRESHOLD = 90;
 const ALARM_COOLDOWN_MS = 30000;
 const PPEAK_SPIKE_PROBABILITY = 0.03;
 const PPEAK_CRITICAL_BASE = 36;
+const PPEAK_SPIKE_RANGE = 5;
+const PRE_ALARM_HR_WAVE_PERIOD = 8;
+const PRE_ALARM_HR_AMPLITUDE = 6;
+const PRE_ALARM_HR_NOISE = 3;
+const PRE_ALARM_SPO2_WAVE_PERIOD = 10;
+const PRE_ALARM_SPO2_AMPLITUDE = 2;
+const PRE_ALARM_SPO2_NOISE = 1;
+const WAVE_PLAY_TEXT = { playing: '暂停', paused: '播放' };
 
 function esc(v) {
   return String(v).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 }
+function deferRender(fn) { requestAnimationFrame(() => requestAnimationFrame(fn)); }
 
 function toggleFieldPanel(id) {
   const panel = document.getElementById(id);
@@ -2002,11 +2011,11 @@ function switchTab(name) {
   const tab = [...document.querySelectorAll('.nav-tab')].find(t => t.dataset.tab === name);
   if (tab) tab.classList.add('active');
 
-  if (name === 'review') setTimeout(() => drawTrendChart(document.getElementById('time-start').value, document.getElementById('time-end').value), 80);
-  if (name === 'patient') setTimeout(() => { if (selectedPatient === null) selectedPatient = 0; startEcg(); updateDetailPanel(); }, 80);
-  if (name === 'vent-central') setTimeout(() => renderVentCentralGrid(), 50);
-  if (name === 'vent-patient') setTimeout(() => { renderVentPatientPanel(); startVentWave(); }, 80);
-  if (name === 'waveform') setTimeout(() => drawWaveform(), 50);
+  if (name === 'review') deferRender(() => drawTrendChart(document.getElementById('time-start').value, document.getElementById('time-end').value));
+  if (name === 'patient') deferRender(() => { if (selectedPatient === null) selectedPatient = 0; startEcg(); updateDetailPanel(); });
+  if (name === 'vent-central') deferRender(() => renderVentCentralGrid());
+  if (name === 'vent-patient') deferRender(() => { renderVentPatientPanel(); startVentWave(); });
+  if (name === 'waveform') deferRender(() => drawWaveform());
 }
 
 function renderBedGrid() {
@@ -2136,7 +2145,7 @@ function renderVentCentralGrid() {
   ].filter(d => ventCentralFields[d.key]);
   grid.innerHTML = VENT_DATA.map((v, i) => `
     <div class="bed-card ${v.ppeak > 35 ? 'status-danger' : 'status-ok'}" onclick="openVentPatient(${i})">
-      <div class="bed-card-header"><div><div class="bed-no">${v.bed}</div><div class="bed-patient">${v.name}</div></div><span class="status-badge ${v.ppeak > 35 ? 'danger' : 'ok'}">${v.ppeak > 35 ? '危急' : '稳定'}</span></div>
+      <div class="bed-card-header"><div><div class="bed-no">${esc(v.bed)}</div><div class="bed-patient">${esc(v.name)}</div></div><span class="status-badge ${v.ppeak > 35 ? 'danger' : 'ok'}">${v.ppeak > 35 ? '危急' : '稳定'}</span></div>
       <div class="vitals-grid">${defs.map(d => `<div class="vital-item"><span class="vital-label">${d.label}</span><span class="vital-value ${d.key === 'ppeak' && v.ppeak > 35 ? 'danger' : ''}">${fmt(v[d.key])}</span><span class="vital-unit">${d.unit}</span></div>`).join('')}</div>
     </div>
   `).join('');
@@ -2189,7 +2198,7 @@ function updateVentData() {
     v.fio2 = Math.max(30, Math.min(100, jitter(v.fio2, 2)));
     v.ppeak = Math.max(16, Math.min(42, jitter(v.ppeak, 1.4)));
     v.rr = Math.max(10, Math.min(30, jitter(v.rr, 1)));
-    if (Math.random() < PPEAK_SPIKE_PROBABILITY) v.ppeak = PPEAK_CRITICAL_BASE + Math.random() * 5;
+    if (Math.random() < PPEAK_SPIKE_PROBABILITY) v.ppeak = PPEAK_CRITICAL_BASE + Math.random() * PPEAK_SPIKE_RANGE;
     if (v.ppeak > 35) maybeTriggerAlarm('vent', i, 'Ppeak', `${fmt(v.ppeak)} cmH₂O`, '> 35 cmH₂O', document.getElementById('module-vent-patient').classList.contains('active') && ventSelectedPatient === i, true);
   });
   if (document.getElementById('module-vent-central').classList.contains('active')) renderVentCentralGrid();
@@ -2203,8 +2212,8 @@ function buildPreAlarmData(event) {
   const baseSpo2 = event.desc.includes('SpO₂') ? 89 : 96;
   for (let secondOffset = 59; secondOffset >= 0; secondOffset--) {
     const t = new Date(alarmTime.getTime() - secondOffset * 1000);
-    const hr = Math.round(baseHr + Math.sin(secondOffset / 8) * 6 + (Math.random() * 6 - 3));
-    const spo2 = Math.round(baseSpo2 + Math.cos(secondOffset / 10) * 2 + (Math.random() * 2 - 1));
+    const hr = Math.round(baseHr + Math.sin(secondOffset / PRE_ALARM_HR_WAVE_PERIOD) * PRE_ALARM_HR_AMPLITUDE + (Math.random() * (PRE_ALARM_HR_NOISE * 2) - PRE_ALARM_HR_NOISE));
+    const spo2 = Math.round(baseSpo2 + Math.cos(secondOffset / PRE_ALARM_SPO2_WAVE_PERIOD) * PRE_ALARM_SPO2_AMPLITUDE + (Math.random() * (PRE_ALARM_SPO2_NOISE * 2) - PRE_ALARM_SPO2_NOISE));
     arr.push({ time: t.toTimeString().slice(0, 8), hr, spo2, nibp: `${110 + Math.round(Math.random() * 18)}/${65 + Math.round(Math.random() * 14)}`, rr: 14 + Math.round(Math.random() * 12), temp: (36.5 + Math.random() * 2.2).toFixed(1), isAlarm: secondOffset === 0 });
   }
   return arr;
@@ -2370,7 +2379,7 @@ function setWaveGain(v, btn) { waveGain = v; btn.parentElement.querySelectorAll(
 function toggleWaveChannel(ch, btn) { waveChannels[ch] = !waveChannels[ch]; btn.classList.toggle('active', waveChannels[ch]); }
 function toggleWavePlay() {
   wavePlaying = !wavePlaying;
-  document.getElementById('wave-play-btn').textContent = wavePlaying ? '暂停' : '播放';
+  document.getElementById('wave-play-btn').textContent = wavePlaying ? WAVE_PLAY_TEXT.playing : WAVE_PLAY_TEXT.paused;
   document.getElementById('wave-play-btn').classList.toggle('active', wavePlaying);
 }
 function drawWaveform() {
@@ -2459,7 +2468,7 @@ function initEnhancements() {
     });
   }
   const waveBtn = document.getElementById('wave-play-btn');
-  if (waveBtn) waveBtn.textContent = '暂停';
+  if (waveBtn) waveBtn.textContent = WAVE_PLAY_TEXT.playing;
   const select = document.getElementById('report-patient');
   if (select) select.innerHTML = PATIENTS.map((p, i) => `<option value="${i}">${p.bed} ${p.name}</option>`).join('');
   renderBedGrid();
