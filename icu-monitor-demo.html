@@ -2332,7 +2332,20 @@ function toggleFieldPanel(id) {
 function togglePatientSection(section, visible) {
   const idMap = { monitor: 'patient-monitor-panel', vent: 'patient-vent-panel' };
   const el = document.getElementById(idMap[section]);
-  if (el) el.style.display = visible ? '' : 'none';
+  if (el) {
+    el.style.display = visible ? '' : 'none';
+    if (section === 'monitor') {
+      const layout = el.closest('.detail-layout');
+      if (layout) layout.style.gridTemplateColumns = visible ? '' : '1fr';
+      // Recalculate ECG canvas widths after layout change
+      requestAnimationFrame(() => {
+        ECG_LEADS.forEach(lead => {
+          const canvas = document.getElementById('ecgCanvas_' + lead.id);
+          if (canvas) canvas.width = canvas.parentElement.clientWidth || 200;
+        });
+      });
+    }
+  }
 }
 
 function buildFieldPanel(id, state, options, onChange) {
