@@ -873,9 +873,9 @@ canvas#trendCanvas {
   body * { visibility:hidden; }
   #report-view, #report-view * { visibility:visible; }
   #report-view { position:absolute; left:0; top:0; width:100%; }
-  #event-report-overlay[style*="flex"], #event-report-overlay[style*="flex"] * { visibility:visible; }
-  #event-report-overlay[style*="flex"] { position:absolute; left:0; top:0; width:100%; background:none; display:block !important; }
-  #event-report-overlay[style*="flex"] .alarm-modal { box-shadow:none; border:none; width:100% !important; max-width:100%; }
+  #event-report-overlay.is-visible, #event-report-overlay.is-visible * { visibility:visible; }
+  #event-report-overlay.is-visible { position:absolute; left:0; top:0; width:100%; background:none; display:block !important; }
+  #event-report-overlay.is-visible .alarm-modal { box-shadow:none; border:none; width:100% !important; max-width:100%; }
 }
 
 /* ===== 患者日志模块 ===== */
@@ -2745,9 +2745,10 @@ function openEventReport(id) {
     <table class="report-table"><thead><tr><th>相对时间</th><th>HR</th><th>SpO₂</th><th>RR</th></tr></thead><tbody>${rows}</tbody></table>
     <div style="margin-top:8px;">处理记录：值班护士已通知医生，执行医嘱后指标回升。</div>
   `;
+  document.getElementById('event-report-overlay').classList.add('is-visible');
   document.getElementById('event-report-overlay').style.display = 'flex';
 }
-function closeEventReport() { document.getElementById('event-report-overlay').style.display = 'none'; }
+function closeEventReport() { const el = document.getElementById('event-report-overlay'); el.style.display = 'none'; el.classList.remove('is-visible'); }
 
 function setWaveSpeed(v, btn) { waveSpeed = v; btn.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }
 function setWaveGain(v, btn) { waveGain = v; btn.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }
