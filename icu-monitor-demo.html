@@ -306,6 +306,17 @@ body {
 
 .back-btn:hover { background: var(--primary); color: var(--bg); }
 
+.patient-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+.patient-section-toggle input { cursor: pointer; accent-color: var(--primary); }
+
 .detail-layout {
   display: grid;
   grid-template-columns: 320px 1fr;
@@ -1147,13 +1158,15 @@ canvas#trendCanvas {
     </div>
     <button class="back-btn" onclick="switchTab('dept')">← 返回大屏</button>
     <button class="filter-btn" onclick="toggleFieldPanel('patient-field-panel')">自定义字段</button>
+    <label class="patient-section-toggle"><input type="checkbox" id="chk-monitor" checked onchange="togglePatientSection('monitor', this.checked)"> 监护仪</label>
+    <label class="patient-section-toggle"><input type="checkbox" id="chk-vent" checked onchange="togglePatientSection('vent', this.checked)"> 呼吸机</label>
   </div>
   <div class="field-panel" id="patient-field-panel"></div>
 
   <!-- 主体：左侧参数 + 右侧ECG -->
   <div class="detail-layout">
     <!-- 左侧参数面板 -->
-    <div class="vitals-panel">
+    <div class="vitals-panel" id="patient-monitor-panel">
       <div class="panel-title">📊 实时生命体征</div>
       <div class="big-vital">
         <span class="bv-label">心率 HR</span>
@@ -1211,7 +1224,7 @@ canvas#trendCanvas {
   </div>
 
   <!-- 呼吸机参数 -->
-  <div class="vent-panel">
+  <div class="vent-panel" id="patient-vent-panel">
     <div class="panel-title">🫁 呼吸机参数</div>
     <div class="vent-grid">
       <div class="vent-item">
@@ -2314,6 +2327,12 @@ function deferRender(fn) { requestAnimationFrame(() => requestAnimationFrame(fn)
 function toggleFieldPanel(id) {
   const panel = document.getElementById(id);
   if (panel) panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+}
+
+function togglePatientSection(section, visible) {
+  const idMap = { monitor: 'patient-monitor-panel', vent: 'patient-vent-panel' };
+  const el = document.getElementById(idMap[section]);
+  if (el) el.style.display = visible ? '' : 'none';
 }
 
 function buildFieldPanel(id, state, options, onChange) {
