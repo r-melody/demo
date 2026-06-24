@@ -2199,8 +2199,14 @@ function updateDetailPanel() {
   Object.keys(patientVisibleFields).forEach(k => setPatientField(k, patientVisibleFields[k]));
 }
 
+const MAX_ALARM_TOASTS = 5;
+
 function showAlarm(alarm) {
   const toaster = document.getElementById('alarm-toaster');
+  const existing = toaster.querySelectorAll('.alarm-toast');
+  if (existing.length >= MAX_ALARM_TOASTS) {
+    dismissToast(existing[0]);
+  }
   const toast = document.createElement('div');
   toast.className = 'alarm-toast';
   let bodyText = alarm.desc || alarm.message || '';
