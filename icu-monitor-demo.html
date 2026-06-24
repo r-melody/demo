@@ -775,14 +775,14 @@ canvas#trendCanvas {
 <div class="nav-bar">
   <div class="nav-logo">⚕ ICU Monitor</div>
   <div class="nav-tabs">
-    <button class="nav-tab active" onclick="switchTab('dept')">科室监护大屏</button>
-    <button class="nav-tab" onclick="switchTab('patient')">单患者详情</button>
-    <button class="nav-tab" onclick="switchTab('review')">数据回顾</button>
-    <button class="nav-tab" onclick="switchTab('alarm')">报警事件</button>
-    <button class="nav-tab" onclick="switchTab('vent-central')">通气大屏</button>
-    <button class="nav-tab" onclick="switchTab('vent-patient')">单患者通气</button>
-    <button class="nav-tab" onclick="switchTab('waveform')">波形回顾</button>
-    <button class="nav-tab" onclick="switchTab('report')">监护报告</button>
+    <button class="nav-tab active" data-tab="dept" onclick="switchTab('dept')">科室监护大屏</button>
+    <button class="nav-tab" data-tab="patient" onclick="switchTab('patient')">单患者详情</button>
+    <button class="nav-tab" data-tab="review" onclick="switchTab('review')">数据回顾</button>
+    <button class="nav-tab" data-tab="alarm" onclick="switchTab('alarm')">报警事件</button>
+    <button class="nav-tab" data-tab="vent-central" onclick="switchTab('vent-central')">通气大屏</button>
+    <button class="nav-tab" data-tab="vent-patient" onclick="switchTab('vent-patient')">单患者通气</button>
+    <button class="nav-tab" data-tab="waveform" onclick="switchTab('waveform')">波形回顾</button>
+    <button class="nav-tab" data-tab="report" onclick="switchTab('report')">监护报告</button>
   </div>
 </div>
 
@@ -1225,7 +1225,7 @@ function renderBedGrid() {
     card.innerHTML = `
       <div class="bed-card-header">
         <div>
-          <div class="bed-no">${p.bed}</div>
+          <div class="bed-no">${esc(p.bed)}</div>
           <div class="bed-patient">${p.name}</div>
           <div class="bed-patient-sub">${p.age}岁 · ${p.gender} · ${p.diag}</div>
         </div>
@@ -1940,6 +1940,16 @@ let wavePhase = 0;
 const waveChannels = { ECG: true, RESP: true, SPO2: false };
 let waveAnim = null;
 let ventWaveAnim = null;
+const HR_HIGH_THRESHOLD = 120;
+const HR_LOW_THRESHOLD = 50;
+const SPO2_LOW_THRESHOLD = 90;
+const ALARM_COOLDOWN_MS = 30000;
+const PPEAK_SPIKE_PROBABILITY = 0.03;
+const PPEAK_CRITICAL_BASE = 36;
+
+function esc(v) {
+  return String(v).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+}
 
 function toggleFieldPanel(id) {
   const panel = document.getElementById(id);
@@ -1949,7 +1959,17 @@ function toggleFieldPanel(id) {
 function buildFieldPanel(id, state, options, onChange) {
   const panel = document.getElementById(id);
   if (!panel) return;
-  panel.innerHTML = options.map(o => `<label><input type="checkbox" ${state[o.key] ? 'checked' : ''} onchange="${onChange}('${o.key}', this.checked)"> ${o.label}</label>`).join('');
+  panel.innerHTML = '';
+  options.forEach(option => {
+    const label = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = state[option.key];
+    input.addEventListener('change', () => onChange(option.key, input.checked));
+    label.appendChild(input);
+    label.appendChild(document.createTextNode(' ' + option.label));
+    panel.appendChild(label);
+  });
 }
 
 function setDeptField(key, checked) { deptVisibleFields[key] = checked; renderBedGrid(); }
@@ -1979,7 +1999,7 @@ function switchTab(name) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   const module = document.getElementById('module-' + name);
   if (module) module.classList.add('active');
-  const tab = [...document.querySelectorAll('.nav-tab')].find(t => (t.getAttribute('onclick') || '').includes(`'${name}'`));
+  const tab = [...document.querySelectorAll('.nav-tab')].find(t => t.dataset.tab === name);
   if (tab) tab.classList.add('active');
 
   if (name === 'review') setTimeout(() => drawTrendChart(document.getElementById('time-start').value, document.getElementById('time-end').value), 80);
@@ -2009,8 +2029,8 @@ function renderBedGrid() {
       <div class="bed-card-header">
         <div>
           <div class="bed-no">${p.bed}</div>
-          <div class="bed-patient">${p.name}</div>
-          <div class="bed-patient-sub">${p.age}岁 · ${p.gender} · ${p.diag}</div>
+          <div class="bed-patient">${esc(p.name)}</div>
+          <div class="bed-patient-sub">${esc(p.age)}岁 · ${esc(p.gender)} · ${esc(p.diag)}</div>
         </div>
         <span class="status-badge ${p.status === 'ok' ? 'ok' : p.status === 'warn' ? 'warn' : 'danger'}">${p.status === 'ok' ? '正常' : p.status === 'warn' ? '警告' : '危急'}</span>
       </div>
@@ -2072,7 +2092,7 @@ function viewAlarmDetail() {
 function maybeTriggerAlarm(source, i, type, value, threshold, withBell, vent = false) {
   const key = `${source}-${i}-${type}`;
   const now = Date.now();
-  if (alarmCooldown[key] && now - alarmCooldown[key] < 30000) return;
+  if (alarmCooldown[key] && now - alarmCooldown[key] < ALARM_COOLDOWN_MS) return;
   alarmCooldown[key] = now;
   const p = PATIENTS[i];
   enqueueAlarm({ bed: p.bed, patient: p.name, type, value, threshold, index: i, withBell, vent });
@@ -2169,7 +2189,7 @@ function updateVentData() {
     v.fio2 = Math.max(30, Math.min(100, jitter(v.fio2, 2)));
     v.ppeak = Math.max(16, Math.min(42, jitter(v.ppeak, 1.4)));
     v.rr = Math.max(10, Math.min(30, jitter(v.rr, 1)));
-    if (Math.random() < 0.03) v.ppeak = 36 + Math.random() * 5;
+    if (Math.random() < PPEAK_SPIKE_PROBABILITY) v.ppeak = PPEAK_CRITICAL_BASE + Math.random() * 5;
     if (v.ppeak > 35) maybeTriggerAlarm('vent', i, 'Ppeak', `${fmt(v.ppeak)} cmH₂O`, '> 35 cmH₂O', document.getElementById('module-vent-patient').classList.contains('active') && ventSelectedPatient === i, true);
   });
   if (document.getElementById('module-vent-central').classList.contains('active')) renderVentCentralGrid();
@@ -2181,11 +2201,11 @@ function buildPreAlarmData(event) {
   const alarmTime = new Date(`${event.date}T${event.time}:00`);
   const baseHr = event.desc.includes('HR') ? 130 : 90;
   const baseSpo2 = event.desc.includes('SpO₂') ? 89 : 96;
-  for (let i = 59; i >= 0; i--) {
-    const t = new Date(alarmTime.getTime() - i * 1000);
-    const hr = Math.round(baseHr + Math.sin(i / 8) * 6 + (Math.random() * 6 - 3));
-    const spo2 = Math.round(baseSpo2 + Math.cos(i / 10) * 2 + (Math.random() * 2 - 1));
-    arr.push({ time: t.toTimeString().slice(0, 8), hr, spo2, nibp: `${110 + Math.round(Math.random() * 18)}/${65 + Math.round(Math.random() * 14)}`, rr: 14 + Math.round(Math.random() * 12), temp: (36.5 + Math.random() * 2.2).toFixed(1), isAlarm: i === 0 });
+  for (let secondOffset = 59; secondOffset >= 0; secondOffset--) {
+    const t = new Date(alarmTime.getTime() - secondOffset * 1000);
+    const hr = Math.round(baseHr + Math.sin(secondOffset / 8) * 6 + (Math.random() * 6 - 3));
+    const spo2 = Math.round(baseSpo2 + Math.cos(secondOffset / 10) * 2 + (Math.random() * 2 - 1));
+    arr.push({ time: t.toTimeString().slice(0, 8), hr, spo2, nibp: `${110 + Math.round(Math.random() * 18)}/${65 + Math.round(Math.random() * 14)}`, rr: 14 + Math.round(Math.random() * 12), temp: (36.5 + Math.random() * 2.2).toFixed(1), isAlarm: secondOffset === 0 });
   }
   return arr;
 }
@@ -2282,7 +2302,7 @@ function renderTrendTable(start, end) {
   if (trendTableMode === 'second') {
     const data = selectedTrendSeconds.length ? selectedTrendSeconds : buildPreAlarmData(EVENTS_DATA.find(e => e.type === 'alarm'));
     tbody.innerHTML = data.map(d => {
-      const abnormal = d.hr > 120 || d.hr < 50 || d.spo2 < 90;
+      const abnormal = d.hr > HR_HIGH_THRESHOLD || d.hr < HR_LOW_THRESHOLD || d.spo2 < SPO2_LOW_THRESHOLD;
       return `<tr class="${abnormal ? 'abnormal' : ''}"><td style="font-family:monospace">${d.time}</td><td>${d.hr}</td><td>${d.spo2}%</td><td>${d.nibp}</td><td>${d.rr}</td><td>${d.temp}°C</td></tr>`;
     }).join('');
     return;
@@ -2293,7 +2313,7 @@ function renderTrendTable(start, end) {
   const endKey = end.replace('T', ' ').slice(0, 13) + ':59';
   const filtered = TREND_DATA.filter(d => d.dateHour >= startKey && d.dateHour <= endKey);
   tbody.innerHTML = filtered.map(d => {
-    const abnormal = d.hr > 120 || d.hr < 50 || d.spo2 < 90 || d.rr > 30 || Number(d.temp) > 38.5;
+    const abnormal = d.hr > HR_HIGH_THRESHOLD || d.hr < HR_LOW_THRESHOLD || d.spo2 < SPO2_LOW_THRESHOLD || d.rr > 30 || Number(d.temp) > 38.5;
     return `<tr class="${abnormal ? 'abnormal' : ''}"><td style="font-family:monospace;white-space:nowrap">${d.dateHour}</td><td>${d.hr}</td><td>${d.spo2}%</td><td>${d.sbp}/${d.dbp}</td><td>${d.rr}</td><td>${d.temp}°C</td></tr>`;
   }).join('');
 }
@@ -2423,12 +2443,21 @@ function simulateDownload(msg) {
 }
 
 function initEnhancements() {
-  buildFieldPanel('dept-field-panel', deptVisibleFields, [{ key: 'hr', label: 'HR' }, { key: 'spo2', label: 'SpO₂' }, { key: 'nibp', label: 'NIBP' }, { key: 'rr', label: 'RR' }, { key: 'temp', label: 'Temp' }], 'setDeptField');
-  buildFieldPanel('patient-field-panel', patientVisibleFields, [{ key: 'hr', label: 'HR' }, { key: 'spo2', label: 'SpO₂' }, { key: 'nibp', label: 'NIBP' }, { key: 'rr', label: 'RR' }, { key: 'temp', label: 'Temp' }], 'setPatientField');
-  buildFieldPanel('vent-central-field-panel', ventCentralFields, [{ key: 'vt', label: 'VT' }, { key: 'peep', label: 'PEEP' }, { key: 'fio2', label: 'FiO₂' }, { key: 'ppeak', label: 'Ppeak' }, { key: 'rr', label: 'RR' }], 'setVentCentralField');
-  buildFieldPanel('vent-patient-field-panel', ventPatientFields, [{ key: 'vt', label: 'VT' }, { key: 'peep', label: 'PEEP' }, { key: 'fio2', label: 'FiO₂' }, { key: 'ppeak', label: 'Ppeak' }, { key: 'rr', label: 'RR' }], 'setVentPatientField');
+  buildFieldPanel('dept-field-panel', deptVisibleFields, [{ key: 'hr', label: 'HR' }, { key: 'spo2', label: 'SpO₂' }, { key: 'nibp', label: 'NIBP' }, { key: 'rr', label: 'RR' }, { key: 'temp', label: 'Temp' }], setDeptField);
+  buildFieldPanel('patient-field-panel', patientVisibleFields, [{ key: 'hr', label: 'HR' }, { key: 'spo2', label: 'SpO₂' }, { key: 'nibp', label: 'NIBP' }, { key: 'rr', label: 'RR' }, { key: 'temp', label: 'Temp' }], setPatientField);
+  buildFieldPanel('vent-central-field-panel', ventCentralFields, [{ key: 'vt', label: 'VT' }, { key: 'peep', label: 'PEEP' }, { key: 'fio2', label: 'FiO₂' }, { key: 'ppeak', label: 'Ppeak' }, { key: 'rr', label: 'RR' }], setVentCentralField);
+  buildFieldPanel('vent-patient-field-panel', ventPatientFields, [{ key: 'vt', label: 'VT' }, { key: 'peep', label: 'PEEP' }, { key: 'fio2', label: 'FiO₂' }, { key: 'ppeak', label: 'Ppeak' }, { key: 'rr', label: 'RR' }], setVentPatientField);
   const channelWrap = document.getElementById('wave-channels');
-  if (channelWrap) channelWrap.innerHTML = ['ECG', 'RESP', 'SPO2'].map(ch => `<button class="filter-btn ${waveChannels[ch] ? 'active' : ''}" onclick="toggleWaveChannel('${ch}', this)">${ch === 'RESP' ? '呼吸波' : ch}</button>`).join('');
+  if (channelWrap) {
+    channelWrap.innerHTML = '';
+    ['ECG', 'RESP', 'SPO2'].forEach(ch => {
+      const btn = document.createElement('button');
+      btn.className = `filter-btn ${waveChannels[ch] ? 'active' : ''}`;
+      btn.textContent = ch === 'RESP' ? '呼吸波' : ch;
+      btn.addEventListener('click', () => toggleWaveChannel(ch, btn));
+      channelWrap.appendChild(btn);
+    });
+  }
   const waveBtn = document.getElementById('wave-play-btn');
   if (waveBtn) waveBtn.textContent = '暂停';
   const select = document.getElementById('report-patient');
