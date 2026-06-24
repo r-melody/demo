@@ -873,6 +873,9 @@ canvas#trendCanvas {
   body * { visibility:hidden; }
   #report-view, #report-view * { visibility:visible; }
   #report-view { position:absolute; left:0; top:0; width:100%; }
+  #event-report-overlay[style*="flex"], #event-report-overlay[style*="flex"] * { visibility:visible; }
+  #event-report-overlay[style*="flex"] { position:absolute; left:0; top:0; width:100%; background:none; display:block !important; }
+  #event-report-overlay[style*="flex"] .alarm-modal { box-shadow:none; border:none; width:100% !important; max-width:100%; }
 }
 
 /* ===== 患者日志模块 ===== */
