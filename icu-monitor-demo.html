@@ -379,12 +379,41 @@ body {
   position: relative;
 }
 
-canvas#ecgCanvas {
-  width: 100%;
-  height: 200px;
-  display: block;
+/* 12导联3x4网格 */
+.ecg-12lead-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(3, auto);
+  gap: 4px;
   background: #050a14;
   border-radius: 6px;
+  padding: 4px;
+}
+
+.ecg-lead-cell {
+  position: relative;
+  background: #050a14;
+  border: 1px solid rgba(0,212,255,0.12);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.ecg-lead-label {
+  position: absolute;
+  top: 3px;
+  left: 5px;
+  font-size: 10px;
+  color: rgba(0,212,255,0.7);
+  font-family: monospace;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.ecg-lead-cell canvas {
+  display: block;
+  width: 100%;
+  height: 80px;
+  background: transparent;
 }
 
 /* 呼吸机参数面板 */
@@ -968,8 +997,24 @@ canvas#trendCanvas {
 
     <!-- 右侧ECG波形 -->
     <div class="ecg-panel">
-      <div class="panel-title">💓 心电图 ECG（实时）</div>
-      <canvas id="ecgCanvas"></canvas>
+      <div class="panel-title">💓 心电图 ECG（实时）12导联</div>
+      <div class="ecg-12lead-grid" id="ecg12Grid">
+        <!-- Row 1: I, aVR, V1, V4 -->
+        <div class="ecg-lead-cell"><span class="ecg-lead-label">I</span><canvas id="ecgCanvas_I"></canvas></div>
+        <div class="ecg-lead-cell"><span class="ecg-lead-label">aVR</span><canvas id="ecgCanvas_aVR"></canvas></div>
+        <div class="ecg-lead-cell"><span class="ecg-lead-label">V1</span><canvas id="ecgCanvas_V1"></canvas></div>
+        <div class="ecg-lead-cell"><span class="ecg-lead-label">V4</span><canvas id="ecgCanvas_V4"></canvas></div>
+        <!-- Row 2: II, aVL, V2, V5 -->
+        <div class="ecg-lead-cell"><span class="ecg-lead-label">II</span><canvas id="ecgCanvas_II"></canvas></div>
+        <div class="ecg-lead-cell"><span class="ecg-lead-label">aVL</span><canvas id="ecgCanvas_aVL"></canvas></div>
+        <div class="ecg-lead-cell"><span class="ecg-lead-label">V2</span><canvas id="ecgCanvas_V2"></canvas></div>
+        <div class="ecg-lead-cell"><span class="ecg-lead-label">V5</span><canvas id="ecgCanvas_V5"></canvas></div>
+        <!-- Row 3: III, aVF, V3, V6 -->
+        <div class="ecg-lead-cell"><span class="ecg-lead-label">III</span><canvas id="ecgCanvas_III"></canvas></div>
+        <div class="ecg-lead-cell"><span class="ecg-lead-label">aVF</span><canvas id="ecgCanvas_aVF"></canvas></div>
+        <div class="ecg-lead-cell"><span class="ecg-lead-label">V3</span><canvas id="ecgCanvas_V3"></canvas></div>
+        <div class="ecg-lead-cell"><span class="ecg-lead-label">V6</span><canvas id="ecgCanvas_V6"></canvas></div>
+      </div>
       <div style="margin-top:10px; display:flex; gap:20px; font-size:12px; color:var(--text-dim);">
         <span>心率: <span id="ecg-hr-label" style="color:var(--ok)">--</span> bpm</span>
         <span>增益: 10 mm/mV</span>
@@ -1430,99 +1475,117 @@ function updateDetailPanel() {
   document.getElementById('ecg-hr-label').textContent = fmt(p.hr);
 }
 
-/* --- ECG Canvas 动画 --- */
+/* --- ECG 12导联 Canvas 动画 --- */
 let ecgAnim = null;
-let ecgPhase = 0;
-let ecgData = [];
-const ECG_POINTS = 500;
+const ECG_POINTS = 300;
 
-// ECG波形模板（简化的PQRST模板）
-function ecgTemplate(t) {
-  // 规范化时间 0~1 对应一个心跳周期
+// 12导联定义：[name, P振幅, Q振幅, R振幅, S振幅, T振幅, 基线偏移]
+// 参数: [P, Q, R, S, T] 相对幅度系数，负数表示向下
+const ECG_LEADS = [
+  { id: 'I',   P:  0.08, Q: -0.04, R:  0.80, S: -0.10, T:  0.15 },
+  { id: 'II',  P:  0.10, Q: -0.05, R:  0.95, S: -0.12, T:  0.18 },
+  { id: 'III', P:  0.05, Q: -0.02, R:  0.50, S: -0.15, T:  0.10 },
+  { id: 'aVR', P: -0.08, Q:  0.05, R: -0.75, S:  0.10, T: -0.14 },
+  { id: 'aVL', P:  0.04, Q: -0.03, R:  0.45, S: -0.08, T:  0.08 },
+  { id: 'aVF', P:  0.07, Q: -0.04, R:  0.65, S: -0.14, T:  0.12 },
+  { id: 'V1',  P:  0.05, Q:  0.00, R:  0.20, S: -0.70, T:  0.08 },
+  { id: 'V2',  P:  0.06, Q: -0.02, R:  0.45, S: -0.60, T:  0.22 },
+  { id: 'V3',  P:  0.07, Q: -0.03, R:  0.65, S: -0.40, T:  0.28 },
+  { id: 'V4',  P:  0.08, Q: -0.04, R:  0.90, S: -0.20, T:  0.30 },
+  { id: 'V5',  P:  0.08, Q: -0.04, R:  0.95, S: -0.12, T:  0.22 },
+  { id: 'V6',  P:  0.07, Q: -0.03, R:  0.80, S: -0.08, T:  0.16 },
+];
+
+// 每个导联独立数据缓冲和相位
+const ecgLeadState = {};
+ECG_LEADS.forEach(lead => {
+  ecgLeadState[lead.id] = { data: new Array(ECG_POINTS).fill(0), phase: Math.random() };
+});
+
+function ecgLeadTemplate(t, lead) {
   const x = (t % 1 + 1) % 1;
-  // P波
-  let v = 0.08 * Math.exp(-((x - 0.15) ** 2) / 0.001);
-  // QRS波群
-  v -= 0.05 * Math.exp(-((x - 0.28) ** 2) / 0.0003);
-  v += 0.9 * Math.exp(-((x - 0.31) ** 2) / 0.00008);
-  v -= 0.15 * Math.exp(-((x - 0.35) ** 2) / 0.0003);
-  // T波
-  v += 0.12 * Math.exp(-((x - 0.55) ** 2) / 0.004);
+  let v = lead.P  * Math.exp(-((x - 0.15) ** 2) / 0.001);
+  v += lead.Q     * Math.exp(-((x - 0.28) ** 2) / 0.0003);
+  v += lead.R     * Math.exp(-((x - 0.31) ** 2) / 0.00008);
+  v += lead.S     * Math.exp(-((x - 0.35) ** 2) / 0.0003);
+  v += lead.T     * Math.exp(-((x - 0.55) ** 2) / 0.004);
   return v;
 }
 
+// 向后兼容：ecgTemplate 指向 Lead II 形态
+function ecgTemplate(t) { return ecgLeadTemplate(t, ECG_LEADS[1]); }
+
 function startEcg() {
   if (ecgAnim) cancelAnimationFrame(ecgAnim);
-  ecgData = new Array(ECG_POINTS).fill(0);
 
-  const canvas = document.getElementById('ecgCanvas');
-  const rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = rect.width || 800;
-  canvas.height = 200;
-  const ctx = canvas.getContext('2d');
+  // 初始化每个导联 canvas 尺寸
+  ECG_LEADS.forEach(lead => {
+    const canvas = document.getElementById('ecgCanvas_' + lead.id);
+    if (!canvas) return;
+    const cell = canvas.parentElement;
+    canvas.width  = cell.clientWidth  || 200;
+    canvas.height = 80;
+    ecgLeadState[lead.id].data = new Array(ECG_POINTS).fill(0);
+  });
 
-  let speed = 2; // pixels per frame
+  const speed = 2;
 
   function draw() {
     const p = selectedPatient !== null ? PATIENTS[selectedPatient] : PATIENTS[0];
-    // 心率影响周期：cycleLen = 数据点数/心跳
-    // bps = 心跳/秒，60/bps = 秒/心跳，乘以帧率基准(60)换算为数据点数
-    // 例：75 bpm → bps=1.25 → cycleLen≈48点/心跳（500点画面约显示10个心跳）
     const bps = (p ? p.hr : 75) / 60;
-    const cycleLen = Math.round(60 / bps); // 约40~80，合理范围
-
-    // 滚动：移除最旧数据，添加新数据
-    for (let s = 0; s < speed; s++) {
-      ecgPhase += 1 / cycleLen;
-      const noise = (Math.random() - 0.5) * 0.02;
-      ecgData.shift();
-      ecgData.push(ecgTemplate(ecgPhase) + noise);
-    }
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#050a14';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // 网格线
-    ctx.strokeStyle = 'rgba(0,212,255,0.07)';
-    ctx.lineWidth = 1;
-    const gridW = canvas.width / 20;
-    const gridH = canvas.height / 8;
-    for (let gx = 0; gx <= 20; gx++) {
-      ctx.beginPath(); ctx.moveTo(gx * gridW, 0); ctx.lineTo(gx * gridW, canvas.height); ctx.stroke();
-    }
-    for (let gy = 0; gy <= 8; gy++) {
-      ctx.beginPath(); ctx.moveTo(0, gy * gridH); ctx.lineTo(canvas.width, gy * gridH); ctx.stroke();
-    }
-
-    // 基线
-    const mid = canvas.height / 2;
-    const amp = canvas.height * 0.38;
-
-    // ECG 波形
+    const cycleLen = Math.round(60 / bps);
     const isDanger = p && p.status === 'danger';
-    ctx.strokeStyle = isDanger ? '#ff3b3b' : '#00ff88';
-    ctx.lineWidth = 2;
-    ctx.shadowBlur = isDanger ? 8 : 4;
-    ctx.shadowColor = isDanger ? '#ff3b3b' : '#00ff88';
-    ctx.beginPath();
-    const step = canvas.width / ECG_POINTS;
-    ecgData.forEach((v, i) => {
-      const x = i * step;
-      const y = mid - v * amp;
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-    ctx.shadowBlur = 0;
+    const lineColor = isDanger ? '#ff3b3b' : '#00ff88';
+    const glowColor = isDanger ? '#ff3b3b' : '#00ff88';
 
-    // 扫描线（滚动头部高亮）
-    const scanX = (ecgData.length - 1) * step;
-    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(scanX, 0);
-    ctx.lineTo(scanX, canvas.height);
-    ctx.stroke();
+    ECG_LEADS.forEach(lead => {
+      const state = ecgLeadState[lead.id];
+      const canvas = document.getElementById('ecgCanvas_' + lead.id);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+
+      // 推进数据
+      for (let s = 0; s < speed; s++) {
+        state.phase += 1 / cycleLen;
+        const noise = (Math.random() - 0.5) * 0.015;
+        state.data.shift();
+        state.data.push(ecgLeadTemplate(state.phase, lead) + noise);
+      }
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#050a14';
+      ctx.fillRect(0, 0, W, H);
+
+      // 网格
+      ctx.strokeStyle = 'rgba(0,212,255,0.06)';
+      ctx.lineWidth = 0.5;
+      const gx = W / 5, gy = H / 4;
+      for (let i = 0; i <= 5; i++) { ctx.beginPath(); ctx.moveTo(i*gx,0); ctx.lineTo(i*gx,H); ctx.stroke(); }
+      for (let j = 0; j <= 4; j++) { ctx.beginPath(); ctx.moveTo(0,j*gy); ctx.lineTo(W,j*gy); ctx.stroke(); }
+
+      // 波形
+      const mid = H / 2;
+      const amp = H * 0.38;
+      ctx.strokeStyle = lineColor;
+      ctx.lineWidth = 1.5;
+      ctx.shadowBlur = isDanger ? 6 : 3;
+      ctx.shadowColor = glowColor;
+      ctx.beginPath();
+      const step = W / ECG_POINTS;
+      state.data.forEach((v, i) => {
+        const px = i * step, py = mid - v * amp;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      });
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // 扫描线
+      const scanX = (state.data.length - 1) * step;
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(scanX, 0); ctx.lineTo(scanX, H); ctx.stroke();
+    });
 
     ecgAnim = requestAnimationFrame(draw);
   }
@@ -1971,11 +2034,10 @@ window.addEventListener('resize', () => {
   }
   const ecgModule = document.getElementById('module-patient');
   if (ecgModule && ecgModule.classList.contains('active')) {
-    const canvas = document.getElementById('ecgCanvas');
-    if (canvas) {
-      // ECG canvas 同样减去面板内边距（左右各16px = 32px）
-      canvas.width = canvas.parentElement.clientWidth - 32;
-    }
+    ECG_LEADS.forEach(lead => {
+      const canvas = document.getElementById('ecgCanvas_' + lead.id);
+      if (canvas) canvas.width = canvas.parentElement.clientWidth || 200;
+    });
   }
 });
 
