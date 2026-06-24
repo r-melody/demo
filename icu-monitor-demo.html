@@ -2329,15 +2329,15 @@ function renderAlarmTable() {
 }
 
 function openEventReport(id) {
-  const a = ALARMS_DATA.find(x => x.id === id);
-  if (!a) return;
+  const alarmData = ALARMS_DATA.find(x => x.id === id);
+  if (!alarmData) return;
   const rows = Array.from({ length: 5 }).map((_, i) => {
     const minute = i - 2;
     return `<tr><td>${minute >= 0 ? '+' + minute : minute} min</td><td>${80 + Math.round(Math.random() * 60)}</td><td>${84 + Math.round(Math.random() * 14)}%</td><td>${12 + Math.round(Math.random() * 18)}</td></tr>`;
   }).join('');
   document.getElementById('event-report-body').innerHTML = `
-    <div>时间：${a.time}　床位：${a.bed}　患者：${a.patient}</div>
-    <div>类型：${a.type}　级别：${a.level === 'critical' ? '危急' : a.level === 'warning' ? '警告' : '提示'}</div>
+    <div>时间：${alarmData.time}　床位：${alarmData.bed}　患者：${alarmData.patient}</div>
+    <div>类型：${alarmData.type}　级别：${alarmData.level === 'critical' ? '危急' : alarmData.level === 'warning' ? '警告' : '提示'}</div>
     <table class="report-table"><thead><tr><th>相对时间</th><th>HR</th><th>SpO₂</th><th>RR</th></tr></thead><tbody>${rows}</tbody></table>
     <div style="margin-top:8px;">处理记录：值班护士已通知医生，执行医嘱后指标回升。</div>
   `;
@@ -2390,11 +2390,11 @@ function toggleSection(btn) {
   body.style.display = body.style.display === 'none' ? 'block' : 'none';
 }
 function drawMiniBars(canvasId, data, color) {
-  const c = document.getElementById(canvasId); if (!c) return;
-  c.width = c.clientWidth; const ctx = c.getContext('2d');
-  ctx.fillStyle = '#050a14'; ctx.fillRect(0, 0, c.width, c.height);
-  const max = Math.max(...data, 1), w = c.width / data.length;
-  data.forEach((v, i) => { const h = (v / max) * (c.height - 20); ctx.fillStyle = color; ctx.fillRect(i * w + 3, c.height - h - 8, w - 6, h); });
+  const canvas = document.getElementById(canvasId); if (!canvas) return;
+  canvas.width = canvas.clientWidth; const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#050a14'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const max = Math.max(...data, 1), w = canvas.width / data.length;
+  data.forEach((v, i) => { const h = (v / max) * (canvas.height - 20); ctx.fillStyle = color; ctx.fillRect(i * w + 3, canvas.height - h - 8, w - 6, h); });
 }
 function generateReport() {
   const idx = Number(document.getElementById('report-patient').value || 0);
